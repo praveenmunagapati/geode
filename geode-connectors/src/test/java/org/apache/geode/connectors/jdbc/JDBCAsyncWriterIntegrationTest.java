@@ -106,24 +106,9 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void canExecuteSQLOnDataBase() throws Exception {
-    stmt.execute("Insert into " + regionTableName + " values ('1', 'emp1', 10)");
-    stmt.execute("Select * from " + regionTableName);
-    DatabaseMetaData metaData = conn.getMetaData();
-    ResultSet tablesRS = metaData.getTables(null, null, "%", null);
-    String realTableName = null;
-    while (tablesRS.next()) {
-      String name = tablesRS.getString("TABLE_NAME");
-      if (name.equalsIgnoreCase(this.regionTableName)) {
-        if (realTableName != null) {
-          throw new IllegalStateException("Duplicate tables that match region name");
-        }
-        realTableName = name;
-      }
-    }
-    if (realTableName == null) {
-      throw new IllegalStateException("no table was found that matches " + regionTableName);
-    }
-    ResultSet primaryKeys = metaData.getPrimaryKeys(null, null, realTableName);
+    stmt.execute("Create Table blobTable" + " (testfield BLOB)");
+    stmt.execute("Insert into blobTable values ('1', 'emp1', 10)");
+    stmt.execute("Select * from blobTable");
   }
 
   @Test

@@ -31,7 +31,9 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.apache.geode.cache.Operation;
 import org.apache.geode.cache.Region;
+import org.apache.geode.internal.cache.InternalCache;
 import org.apache.geode.pdx.PdxInstance;
+import org.apache.geode.pdx.PdxInstanceFactory;
 import org.apache.geode.pdx.internal.PdxInstanceImpl;
 
 public class JDBCManager {
@@ -56,6 +58,61 @@ public class JDBCManager {
 
   JDBCManager(JDBCConfiguration config) {
     this.config = config;
+  }
+
+  public PdxInstance read(Region region, Object key) {
+    String tableName = getTableName(region);
+    List<ColumnValue> columnList = getColumnToValueList(tableName, key, null, Operation.GET);
+    PreparedStatement pstmt = getPreparedStatement(columnList, tableName, Operation.GET, 0);
+    synchronized (pstmt) {
+      try {
+        int idx = 0;
+        for (ColumnValue cv : columnList) {
+          idx++;
+          pstmt.setObject(idx, cv.getValue());
+        }
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+          InternalCache cache = (InternalCache) region.getRegionService();
+          String objectClassName = getObjectClassName(tableName);
+          PdxInstanceFactory factory;
+          if (objectClassName != null) {
+            factory = cache.createPdxInstanceFactory(objectClassName);
+          } else {
+            factory = cache.createPdxInstanceFactory("no class", false);
+          }
+          ResultSetMetaData rsmd = rs.getMetaData();
+          int ColumnsNumber = rsmd.getColumnCount();
+          String keyColumnName = getKeyColumnName(tableName);
+          for (int i = 1; i <= ColumnsNumber; i++) {
+            Object columnValue = rs.getObject(i);
+            String columnName = rsmd.getColumnName(i);
+            String fieldName = mapColumnNameToFieldName(columnName, tableName);
+            if (!isFieldExcluded(fieldName) && (isKeyPartOfValue(region.getName())
+                || !keyColumnName.equalsIgnoreCase(columnName))) {
+              factory.writeField(fieldName, columnValue, Object.class);
+            }
+          }
+          if (rs.next()) {
+            throw new IllegalStateException(
+                "Multiple rows returned for key " + key + " on table " + tableName);
+          }
+          return factory.create();
+        } else {
+          return null;
+        }
+      } catch (SQLException e) {
+        handleSQLException(e);
+        return null; // this is never reached
+      } finally {
+        clearStatementParameters(pstmt);
+      }
+    }
+  }
+
+  private String getObjectClassName(String tableName) {
+    // TODO NYI
+    return null;
   }
 
   public void write(Region region, Operation operation, Object key, PdxInstance value) {
@@ -103,12 +160,12 @@ public class JDBCManager {
         }
         return 0;
       } finally {
-        clearStatement(pstmt);
+        clearStatementParameters(pstmt);
       }
     }
   }
 
-  private void clearStatement(PreparedStatement ps) {
+  private void clearStatementParameters(PreparedStatement ps) {
     try {
       ps.clearParameters();
     } catch (SQLException ignore) {
@@ -123,9 +180,20 @@ public class JDBCManager {
       return getUpdateQueryString(tableName, columnList);
     } else if (operation.isDestroy()) {
       return getDestroyQueryString(tableName, columnList);
+    } else if (operation.isGet()) {
+      return getSelectQueryString(tableName, columnList);
     } else {
       throw new IllegalStateException("unsupported operation " + operation);
     }
+  }
+
+  private String getSelectQueryString(String tableName, List<ColumnValue> columnList) {
+    assert columnList.size() == 1;
+    ColumnValue keyCV = columnList.get(0);
+    assert keyCV.isKey();
+    StringBuilder query = new StringBuilder(
+        "SELECT * FROM " + tableName + " WHERE " + keyCV.getColumnName() + " = ?");
+    return query.toString();
   }
 
   private String getDestroyQueryString(String tableName, List<ColumnValue> columnList) {
@@ -254,7 +322,7 @@ public class JDBCManager {
     StatementKey key = new StatementKey(pdxTypeId, operation, tableName);
     return getPreparedStatementCache().computeIfAbsent(key, k -> {
       String query = getQueryString(tableName, columnList, operation);
-      System.out.println("query=" + query);
+      System.out.println("query=" + query); // TODO remove debugging
       Connection con = getConnection(null, null);
       try {
         return con.prepareStatement(query);
@@ -269,7 +337,7 @@ public class JDBCManager {
       Operation operation) {
     String keyColumnName = getKeyColumnName(tableName);
     ColumnValue keyCV = new ColumnValue(true, keyColumnName, key);
-    if (operation.isDestroy()) {
+    if (operation.isDestroy() || operation.isGet()) {
       return Collections.singletonList(keyCV);
     }
 
@@ -300,6 +368,16 @@ public class JDBCManager {
   private String mapFieldNameToColumnName(String fieldName, String tableName) {
     // TODO check config for mapping
     return fieldName;
+  }
+
+  private String mapColumnNameToFieldName(String columnName, String tableName) {
+    // TODO check config for mapping
+    return columnName.toLowerCase();
+  }
+
+  private boolean isKeyPartOfValue(String regionName) {
+    // TODO check config for mapping
+    return false;
   }
 
   private String getKeyColumnName(String tableName) {

@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
@@ -35,6 +36,8 @@ import org.mockito.ArgumentCaptor;
 import org.apache.geode.cache.Operation;
 import org.apache.geode.cache.Region;
 import org.apache.geode.internal.cache.GemFireCacheImpl;
+import org.apache.geode.pdx.PdxInstance;
+import org.apache.geode.pdx.PdxInstanceFactory;
 import org.apache.geode.pdx.internal.PdxInstanceImpl;
 import org.apache.geode.pdx.internal.PdxType;
 import org.apache.geode.test.fake.Fakes;
@@ -99,12 +102,14 @@ public class JDBCManagerUnitTest {
 
     private ResultSet tableResults;
     private ResultSet primaryKeyResults;
+    private ResultSet queryResultSet;
 
     TestableJDBCManagerWithResultSets(JDBCConfiguration config, ResultSet tableResults,
-        ResultSet primaryKeyResults) {
+        ResultSet primaryKeyResults, ResultSet queryResultSet) {
       super(config);
       this.tableResults = tableResults;
       this.primaryKeyResults = primaryKeyResults;
+      this.queryResultSet = queryResultSet;
     }
 
     @Override
@@ -130,6 +135,19 @@ public class JDBCManagerUnitTest {
       preparedStatement = mock(PreparedStatement.class);
       when(preparedStatement.getUpdateCount()).thenReturn(1);
 
+
+      if (this.queryResultSet == null) {
+        queryResultSet = mock(ResultSet.class);
+        ResultSetMetaData rsmd = mock(ResultSetMetaData.class);
+        when(rsmd.getColumnCount()).thenReturn(3);
+        when(rsmd.getColumnName(anyInt())).thenReturn("ID", "NAME", "AGE");
+        when(queryResultSet.getMetaData()).thenReturn(rsmd);
+        when(queryResultSet.next()).thenReturn(true, false);
+        when(queryResultSet.getObject(anyInt())).thenReturn("1", "Emp1", 21);
+      }
+
+      when(preparedStatement.executeQuery()).thenReturn(queryResultSet);
+
       connection = mock(Connection.class);
       when(connection.getMetaData()).thenReturn(metaData);
       when(connection.prepareStatement(any())).thenReturn(preparedStatement);
@@ -153,7 +171,8 @@ public class JDBCManagerUnitTest {
     when(rs.next()).thenReturn(true, false);
     when(rs.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
 
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(driver, url), rs, rsKeys);
+    this.mgr =
+        new TestableJDBCManagerWithResultSets(createConfiguration(driver, url), rs, rsKeys, null);
   }
 
   private void createDefaultManager() throws SQLException {
@@ -169,9 +188,11 @@ public class JDBCManagerUnitTest {
         upsertReturn);
   }
 
-  private void createManager(ResultSet tableNames, ResultSet primaryKeys) {
-    this.mgr = new TestableJDBCManagerWithResultSets(
-        createConfiguration("java.lang.String", "fakeURL"), tableNames, primaryKeys);
+  private void createManager(ResultSet tableNames, ResultSet primaryKeys,
+      ResultSet queryResultSet) {
+    this.mgr =
+        new TestableJDBCManagerWithResultSets(createConfiguration("java.lang.String", "fakeURL"),
+            tableNames, primaryKeys, queryResultSet);
   }
 
   private JDBCConfiguration createConfiguration(String driver, String url) {
@@ -428,7 +449,7 @@ public class JDBCManagerUnitTest {
     ResultSet tables = mock(ResultSet.class);
     when(tables.next()).thenReturn(true, true, false);
     when(tables.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
-    createManager(tables, primaryKeys);
+    createManager(tables, primaryKeys, null);
     catchException(this.mgr).computeKeyColumnName(regionName);
     assertThat((Exception) caughtException()).isInstanceOf(IllegalStateException.class);
     assertThat(caughtException().getMessage()).isEqualTo("Duplicate tables that match region name");
@@ -439,7 +460,7 @@ public class JDBCManagerUnitTest {
     ResultSet tables = null;
     ResultSet primaryKeys = mock(ResultSet.class);
     when(primaryKeys.next()).thenReturn(false);
-    createManager(tables, primaryKeys);
+    createManager(tables, primaryKeys, null);
     catchException(this.mgr).computeKeyColumnName(regionName);
     assertThat((Exception) caughtException()).isInstanceOf(IllegalStateException.class);
     assertThat(caughtException().getMessage())
@@ -451,10 +472,70 @@ public class JDBCManagerUnitTest {
     ResultSet tables = null;
     ResultSet primaryKeys = mock(ResultSet.class);
     when(primaryKeys.next()).thenReturn(true, true, false);
-    createManager(tables, primaryKeys);
+    createManager(tables, primaryKeys, null);
     catchException(this.mgr).computeKeyColumnName(regionName);
     assertThat((Exception) caughtException()).isInstanceOf(IllegalStateException.class);
     assertThat(caughtException().getMessage())
         .isEqualTo("The table " + regionName + " has more than one primary key column.");
+  }
+
+  @Test
+  public void verifyReadThatMissesReturnsNull() throws SQLException {
+    ResultSet queryResults = mock(ResultSet.class);
+    when(queryResults.next()).thenReturn(false);
+    createManager(null, null, queryResults);
+    GemFireCacheImpl cache = Fakes.cache();
+    Region region = Fakes.region(regionName, cache);
+    assertThat(this.mgr.read(region, "2")).isNull();
+  }
+
+  @Test
+  public void verifyReadWithMultipleResultsFails() throws SQLException {
+    ResultSet queryResults = mock(ResultSet.class);
+    when(queryResults.next()).thenReturn(true, true, false);
+    ResultSetMetaData rsmd = mock(ResultSetMetaData.class);
+    when(rsmd.getColumnCount()).thenReturn(3);
+    when(rsmd.getColumnName(anyInt())).thenReturn("ID", "NAME", "AGE");
+    when(queryResults.getMetaData()).thenReturn(rsmd);
+    createManager(null, null, queryResults);
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+    Region region = Fakes.region(regionName, cache);
+    catchException(this.mgr).read(region, "1");
+    assertThat((Exception) caughtException()).isInstanceOf(IllegalStateException.class);
+    assertThat(caughtException().getMessage())
+        .isEqualTo("Multiple rows returned for key 1 on table " + regionName);
+  }
+
+  @Test
+  public void verifyReadThatHitsReturnsValue() throws SQLException {
+    createDefaultManager();
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+
+    Region region = Fakes.region(regionName, cache);
+    Object key = "1";
+    PdxInstance value = this.mgr.read(region, key);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .isEqualTo("SELECT * FROM " + regionName + " WHERE " + ID_COLUMN_NAME + " = ?");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(1)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("1");
+    assertThat(value).isSameAs(pi);
+    ArgumentCaptor<String> fieldNameCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> fieldValueCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(factory, times(2)).writeField(fieldNameCaptor.capture(), fieldValueCaptor.capture(),
+        any());
+    assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("name", "age"));
+    assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
   }
 }
