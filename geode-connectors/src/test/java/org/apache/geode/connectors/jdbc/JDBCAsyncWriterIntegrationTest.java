@@ -40,21 +40,12 @@ import org.awaitility.Awaitility;
 
 @Category(IntegrationTest.class)
 public class JDBCAsyncWriterIntegrationTest {
-
   private Cache cache;
-
   private Connection conn;
-
   private Statement stmt;
-
   JDBCAsyncWriter jdbcWriter;
-
   private String dbName = "DerbyDB";
-
   private String regionTableName = "employees";
-
-  private String driver = "org.apache.derby.jdbc.EmbeddedDriver";
-
   private String connectionURL = "jdbc:derby:memory:" + dbName + ";create=true";
 
   @Before
@@ -81,7 +72,6 @@ public class JDBCAsyncWriterIntegrationTest {
   }
 
   public void setupDB() throws Exception {
-    Class.forName(driver);
     conn = DriverManager.getConnection(connectionURL);
     stmt = conn.createStatement();
     stmt.execute("Create Table " + regionTableName
@@ -102,7 +92,6 @@ public class JDBCAsyncWriterIntegrationTest {
 
   private Properties getRequiredProperties() {
     Properties props = new Properties();
-    props.setProperty("driver", this.driver);
     props.setProperty("url", this.connectionURL);
     return props;
   }

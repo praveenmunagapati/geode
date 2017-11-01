@@ -252,15 +252,6 @@ public class JDBCManager {
       // If isClosed throws fall through and connect again
     }
 
-    if (result == null) {
-      try {
-        Class.forName(this.config.getDriver());
-      } catch (ClassNotFoundException e) {
-        // TODO: consider a different exception
-        throw new IllegalStateException(
-            "Driver class \"" + this.config.getDriver() + "\" not found", e);
-      }
-    }
     try {
       result =
           createConnection(this.config.getURL(), this.config.getUser(), this.config.getPassword());

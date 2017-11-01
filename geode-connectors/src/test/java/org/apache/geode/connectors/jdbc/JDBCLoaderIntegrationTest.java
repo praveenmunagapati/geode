@@ -39,7 +39,6 @@ public class JDBCLoaderIntegrationTest {
   private Statement stmt;
   private String dbName = "DerbyDB";
   private String regionTableName = "employees";
-  private String driver = "org.apache.derby.jdbc.EmbeddedDriver";
   private String connectionURL = "jdbc:derby:memory:" + dbName + ";create=true";
 
   @Before
@@ -66,7 +65,6 @@ public class JDBCLoaderIntegrationTest {
   }
 
   public void setupDB() throws Exception {
-    Class.forName(driver);
     conn = DriverManager.getConnection(connectionURL);
     stmt = conn.createStatement();
     stmt.execute("Create Table " + regionTableName
@@ -87,7 +85,6 @@ public class JDBCLoaderIntegrationTest {
 
   private Properties getRequiredProperties() {
     Properties props = new Properties();
-    props.setProperty("driver", this.driver);
     props.setProperty("url", this.connectionURL);
     return props;
   }

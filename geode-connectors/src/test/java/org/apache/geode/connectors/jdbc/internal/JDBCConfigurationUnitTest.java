@@ -44,33 +44,14 @@ public class JDBCConfigurationUnitTest {
   public void testMissingAllRequiredProperties() {
     Properties props = new Properties();
     expectedException.expect(IllegalArgumentException.class);
-    expectedException.expectMessage("missing required properties: [driver, url]");
+    expectedException.expectMessage("missing required properties: [url]");
     new JDBCConfiguration(props);
-  }
-
-  @Test
-  public void testMissingDriverRequiredProperties() {
-    Properties props = new Properties();
-    props.setProperty("url", "");
-    expectedException.expect(IllegalArgumentException.class);
-    expectedException.expectMessage("missing required properties: [driver]");
-    new JDBCConfiguration(props);
-  }
-
-  @Test
-  public void testDriverProperty() {
-    Properties props = new Properties();
-    props.setProperty("url", "");
-    props.setProperty("driver", "myDriver");
-    JDBCConfiguration config = new JDBCConfiguration(props);
-    assertThat(config.getDriver()).isEqualTo("myDriver");
   }
 
   @Test
   public void testURLProperty() {
     Properties props = new Properties();
     props.setProperty("url", "myUrl");
-    props.setProperty("driver", "");
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getURL()).isEqualTo("myUrl");
   }
@@ -79,7 +60,6 @@ public class JDBCConfigurationUnitTest {
   public void testDefaultUser() {
     Properties props = new Properties();
     props.setProperty("url", "");
-    props.setProperty("driver", "");
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getUser()).isEqualTo(null);
   }
@@ -88,7 +68,6 @@ public class JDBCConfigurationUnitTest {
   public void testDefaultPassword() {
     Properties props = new Properties();
     props.setProperty("url", "");
-    props.setProperty("driver", "");
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getPassword()).isEqualTo(null);
   }
@@ -97,7 +76,6 @@ public class JDBCConfigurationUnitTest {
   public void testUser() {
     Properties props = new Properties();
     props.setProperty("url", "");
-    props.setProperty("driver", "");
     props.setProperty("user", "myUser");
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getUser()).isEqualTo("myUser");
@@ -107,7 +85,6 @@ public class JDBCConfigurationUnitTest {
   public void testPassword() {
     Properties props = new Properties();
     props.setProperty("url", "");
-    props.setProperty("driver", "");
     props.setProperty("password", "myPassword");
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getPassword()).isEqualTo("myPassword");

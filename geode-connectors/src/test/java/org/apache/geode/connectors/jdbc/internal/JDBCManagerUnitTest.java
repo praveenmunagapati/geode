@@ -164,7 +164,7 @@ public class JDBCManagerUnitTest {
   @After
   public void tearDown() throws Exception {}
 
-  private void createManager(String driver, String url) throws SQLException {
+  private void createManager(String url) throws SQLException {
     ResultSet rsKeys = mock(ResultSet.class);
     when(rsKeys.next()).thenReturn(true, false);
     when(rsKeys.getString("COLUMN_NAME")).thenReturn(ID_COLUMN_NAME);
@@ -173,34 +173,30 @@ public class JDBCManagerUnitTest {
     when(rs.next()).thenReturn(true, false);
     when(rs.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
 
-    this.mgr =
-        new TestableJDBCManagerWithResultSets(createConfiguration(driver, url), rs, rsKeys, null);
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(url), rs, rsKeys, null);
   }
 
   private void createDefaultManager() throws SQLException {
-    createManager("java.lang.String", "fakeURL");
+    createManager("fakeURL");
   }
 
   private void createUpsertManager() {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("java.lang.String", "fakeURL"));
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL"));
   }
 
   private void createUpsertManager(int upsertReturn) {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("java.lang.String", "fakeURL"),
-        upsertReturn);
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL"), upsertReturn);
   }
 
   private void createManager(ResultSet tableNames, ResultSet primaryKeys,
       ResultSet queryResultSet) {
-    this.mgr =
-        new TestableJDBCManagerWithResultSets(createConfiguration("java.lang.String", "fakeURL"),
-            tableNames, primaryKeys, queryResultSet);
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration("fakeURL"), tableNames,
+        primaryKeys, queryResultSet);
   }
 
-  private JDBCConfiguration createConfiguration(String driver, String url) {
+  private JDBCConfiguration createConfiguration(String url) {
     Properties props = new Properties();
     props.setProperty("url", url);
-    props.setProperty("driver", driver);
     return new JDBCConfiguration(props);
   }
 
@@ -323,15 +319,6 @@ public class JDBCManagerUnitTest {
     when(pdxType.getTypeId()).thenReturn(1);
     when(pdxInstance.getPdxType()).thenReturn(pdxType);
     return pdxInstance;
-  }
-
-  @Test
-  public void verifyMissingDriverClass() throws SQLException {
-    createManager("non existent driver", "fakeURL");
-    catchException(this.mgr).getConnection(null, null);
-    assertThat((Exception) caughtException()).isInstanceOf(IllegalStateException.class);
-    assertThat(caughtException().getMessage())
-        .isEqualTo("Driver class \"non existent driver\" not found");
   }
 
   @Test

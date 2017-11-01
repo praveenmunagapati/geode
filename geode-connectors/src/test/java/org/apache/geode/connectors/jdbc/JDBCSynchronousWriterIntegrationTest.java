@@ -53,8 +53,6 @@ public class JDBCSynchronousWriterIntegrationTest {
 
   private String regionTableName = "employees";
 
-  private String driver = "org.apache.derby.jdbc.EmbeddedDriver";
-
   private String connectionURL = "jdbc:derby:memory:" + dbName + ";create=true";
 
   @Before
@@ -81,7 +79,6 @@ public class JDBCSynchronousWriterIntegrationTest {
   }
 
   public void setupDB() throws Exception {
-    Class.forName(driver);
     conn = DriverManager.getConnection(connectionURL);
     stmt = conn.createStatement();
     stmt.execute("Create Table " + regionTableName
@@ -102,7 +99,6 @@ public class JDBCSynchronousWriterIntegrationTest {
 
   private Properties getRequiredProperties() {
     Properties props = new Properties();
-    props.setProperty("driver", this.driver);
     props.setProperty("url", this.connectionURL);
     return props;
   }
