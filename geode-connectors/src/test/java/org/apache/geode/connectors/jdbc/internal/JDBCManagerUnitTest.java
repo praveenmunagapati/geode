@@ -357,6 +357,19 @@ public class JDBCManagerUnitTest {
   }
 
   @Test
+  public void callClose() throws SQLException {
+    createDefaultManager();
+    this.mgr.close();
+  }
+
+  @Test
+  public void callCloseWithConnection() throws SQLException {
+    createDefaultManager();
+    this.mgr.getConnection(null, null);
+    this.mgr.close();
+  }
+
+  @Test
   public void verifyInsertUpdate() throws SQLException {
     createUpsertManager();
     GemFireCacheImpl cache = Fakes.cache();

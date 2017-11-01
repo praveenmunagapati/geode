@@ -458,4 +458,13 @@ public class JDBCManager {
       }
     }
   }
+
+  public void close() {
+    if (this.conn != null) {
+      try {
+        this.conn.close();
+      } catch (SQLException ignore) {
+      }
+    }
+  }
 }

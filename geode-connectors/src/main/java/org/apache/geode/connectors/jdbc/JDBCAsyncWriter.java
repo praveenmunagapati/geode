@@ -41,7 +41,11 @@ public class JDBCAsyncWriter implements AsyncEventListener {
   private JDBCManager manager;
 
   @Override
-  public void close() {}
+  public void close() {
+    if (this.manager != null) {
+      this.manager.close();
+    }
+  }
 
   /**
    * precondition: DefaultQuery.setPdxReadSerialized(true)

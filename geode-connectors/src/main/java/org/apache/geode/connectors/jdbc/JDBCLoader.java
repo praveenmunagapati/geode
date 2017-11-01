@@ -32,7 +32,11 @@ public class JDBCLoader<K, V> implements CacheLoader<K, V> {
   private JDBCManager manager;
 
   @Override
-  public void close() {}
+  public void close() {
+    if (this.manager != null) {
+      this.manager.close();
+    }
+  }
 
   @SuppressWarnings("unchecked")
   @Override

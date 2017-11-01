@@ -42,7 +42,11 @@ public class JDBCSynchronousWriter<K, V> implements CacheWriter<K, V> {
   }
 
   @Override
-  public void close() {}
+  public void close() {
+    if (this.manager != null) {
+      this.manager.close();
+    }
+  }
 
   private PdxInstance getPdxNewValue(EntryEvent<K, V> event) {
     // TODO: have a better API that lets you do this
