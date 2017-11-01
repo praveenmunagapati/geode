@@ -17,6 +17,9 @@ package org.apache.geode.connectors.jdbc;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.geode.CopyHelper;
+import org.apache.geode.cache.EntryEvent;
+import org.apache.geode.cache.SerializedCacheValue;
 import org.apache.geode.cache.asyncqueue.AsyncEvent;
 import org.apache.geode.cache.asyncqueue.AsyncEventListener;
 import org.apache.geode.cache.query.internal.DefaultQuery;
@@ -40,6 +43,20 @@ public class JDBCAsyncWriter implements AsyncEventListener {
   @Override
   public void close() {}
 
+  /**
+   * precondition: DefaultQuery.setPdxReadSerialized(true)
+   */
+  @SuppressWarnings("rawtypes")
+  private PdxInstance getPdxInstance(AsyncEvent event) {
+    Object v = event.getDeserializedValue();
+    if (!(v instanceof PdxInstance)) {
+      v = CopyHelper.copy(v);
+    }
+    return (PdxInstance) v;
+  }
+
+
+  @SuppressWarnings("rawtypes")
   @Override
   public boolean processEvents(List<AsyncEvent> events) {
     changeTotalEvents(events.size());
@@ -47,13 +64,9 @@ public class JDBCAsyncWriter implements AsyncEventListener {
     DefaultQuery.setPdxReadSerialized(true);
     try {
       for (AsyncEvent event : events) {
-        // TODO: in some cases getDeserializedValue may return non-PdxInstance.
-        // In that case need to serialize and deserialize.
         try {
-          PdxInstance value = (PdxInstance) event.getDeserializedValue();
-          logger.info("AsyncEventListener event : " + event);
-          this.manager.write(event.getRegion(), event.getOperation(), event.getKey(), value);
-
+          this.manager.write(event.getRegion(), event.getOperation(), event.getKey(),
+              getPdxInstance(event));
           changeSuccessfulEvents(1);
         } catch (RuntimeException ex) {
           // TODO improve the following logging
@@ -70,7 +83,7 @@ public class JDBCAsyncWriter implements AsyncEventListener {
   public void init(Properties props) {
     JDBCConfiguration config = new JDBCConfiguration(props);
     this.manager = new JDBCManager(config);
-  };
+  }
 
   private synchronized void changeTotalEvents(long delta) {
     this.totalEvents += delta;

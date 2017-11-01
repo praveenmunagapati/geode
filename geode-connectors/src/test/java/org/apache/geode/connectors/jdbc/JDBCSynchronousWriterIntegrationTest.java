@@ -14,12 +14,13 @@
  */
 package org.apache.geode.connectors.jdbc;
 
+import static com.googlecode.catchexception.CatchException.catchException;
+import static com.googlecode.catchexception.CatchException.caughtException;
 import static org.apache.geode.distributed.ConfigurationProperties.MCAST_PORT;
 import static org.assertj.core.api.Assertions.*;
 
 import java.sql.*;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.*;
 import org.junit.experimental.categories.Category;
@@ -28,7 +29,6 @@ import org.apache.geode.cache.CacheFactory;
 import org.apache.geode.cache.Region;
 import org.apache.geode.cache.RegionFactory;
 import org.apache.geode.cache.RegionShortcut;
-import org.apache.geode.connectors.jdbc.JDBCAsyncWriter;
 import org.apache.geode.internal.cache.GemFireCacheImpl;
 import org.apache.geode.pdx.PdxInstance;
 import org.apache.geode.pdx.PdxReader;
@@ -36,10 +36,9 @@ import org.apache.geode.pdx.PdxSerializable;
 import org.apache.geode.pdx.PdxSerializationException;
 import org.apache.geode.pdx.PdxWriter;
 import org.apache.geode.test.junit.categories.IntegrationTest;
-import org.awaitility.Awaitility;
 
 @Category(IntegrationTest.class)
-public class JDBCAsyncWriterIntegrationTest {
+public class JDBCSynchronousWriterIntegrationTest {
 
   private Cache cache;
 
@@ -47,7 +46,8 @@ public class JDBCAsyncWriterIntegrationTest {
 
   private Statement stmt;
 
-  JDBCAsyncWriter jdbcWriter;
+  @SuppressWarnings("rawtypes")
+  JDBCSynchronousWriter jdbcWriter;
 
   private String dbName = "DerbyDB";
 
@@ -108,31 +108,15 @@ public class JDBCAsyncWriterIntegrationTest {
   }
 
   @Test
-  public void validateJDBCAsyncWriterTotalEvents() {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
-    PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
-        .writeInt("age", 55).create();
-    PdxInstance pdx2 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp2")
-        .writeInt("age", 21).create();
-    employees.put("1", pdx1);
-    employees.put("2", pdx2);
-
-    Awaitility.await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getTotalEvents()).isEqualTo(2));
-  }
-
-  @Test
   public void canInsertIntoTable() throws Exception {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).create();
     PdxInstance pdx2 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp2")
         .writeInt("age", 21).create();
     employees.put("1", pdx1);
     employees.put("2", pdx2);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(2));
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
@@ -148,13 +132,11 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void verifyThatPdxFieldNamedSameAsPrimaryKeyIsIgnored() throws Exception {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).writeInt("id", 3).create();
     employees.put("1", pdx1);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(1));
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
@@ -166,22 +148,20 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void putNonPdxInstanceFails() {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
-    employees.put("1", "non pdx instance");
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getTotalEvents()).isEqualTo(1));
-    assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(0);
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
+    catchException(employees).put("1", "non pdx instance");
+    assertThat((Exception) caughtException()).isInstanceOf(ClassCastException.class);
+    assertThat(caughtException().getMessage())
+        .isEqualTo("java.lang.String cannot be cast to org.apache.geode.pdx.PdxInstance");
   }
 
   @Test
   public void putNonPdxInstanceThatIsPdxSerializable() throws SQLException {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     Object value = new TestEmployee("Emp2", 22);
     employees.put("2", value);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(1));
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
@@ -215,16 +195,14 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void canDestroyFromTable() throws Exception {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).create();
     PdxInstance pdx2 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp2")
         .writeInt("age", 21).create();
     employees.put("1", pdx1);
     employees.put("2", pdx2);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(2));
 
     try {
       employees.destroy("1");
@@ -233,9 +211,6 @@ public class JDBCAsyncWriterIntegrationTest {
       // which does not work because our PdxInstance
       // does not have a real class
     }
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(3));
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
@@ -247,13 +222,11 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void canUpdateTable() throws Exception {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).create();
     employees.put("1", pdx1);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(1));
 
     PdxInstance pdx3 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 72).create();
@@ -265,9 +238,6 @@ public class JDBCAsyncWriterIntegrationTest {
       // does not have a real class
     }
 
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(2));
-
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
     assertThat(rs.getObject("age")).isEqualTo(72);
@@ -276,13 +246,11 @@ public class JDBCAsyncWriterIntegrationTest {
 
   @Test
   public void canUpdateBecomeInsert() throws Exception {
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).create();
     employees.put("1", pdx1);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(1));
 
     stmt.execute("delete from " + regionTableName + " where id = '1'");
     validateTableRowCount(0);
@@ -297,9 +265,6 @@ public class JDBCAsyncWriterIntegrationTest {
       // does not have a real class
     }
 
-    Awaitility.await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(2));
-
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
     assertThat(rs.getString("id")).isEqualTo("1");
@@ -313,13 +278,11 @@ public class JDBCAsyncWriterIntegrationTest {
     stmt.execute("Insert into " + regionTableName + " values('1', 'bogus', 11)");
     validateTableRowCount(1);
 
-    Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
         .writeInt("age", 55).create();
     employees.put("1", pdx1);
-
-    Awaitility.await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> assertThat(jdbcWriter.getSuccessfulEvents()).isEqualTo(1));
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();
@@ -329,14 +292,12 @@ public class JDBCAsyncWriterIntegrationTest {
     assertThat(rs.next()).isFalse();
   }
 
-  private Region createRegionWithJDBCAsyncWriter(String regionName, Properties props) {
-    jdbcWriter = new JDBCAsyncWriter();
+  private Region createRegionWithJDBCSynchronousWriter(String regionName, Properties props) {
+    jdbcWriter = new JDBCSynchronousWriter();
     jdbcWriter.init(props);
-    cache.createAsyncEventQueueFactory().setBatchSize(1).setBatchTimeInterval(1)
-        .create("jdbcAsyncQueue", jdbcWriter);
 
     RegionFactory rf = cache.createRegionFactory(RegionShortcut.REPLICATE);
-    rf.addAsyncEventQueueId("jdbcAsyncQueue");
+    rf.setCacheWriter(jdbcWriter);
     return rf.create(regionName);
   }
 
