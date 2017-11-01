@@ -42,10 +42,7 @@ public class JDBCAsyncWriter implements AsyncEventListener {
   private JDBCManager manager;
 
   @Override
-  public void close() {
-    // TODO Auto-generated method stub
-
-  }
+  public void close() {}
 
   @Override
   public boolean processEvents(List<AsyncEvent> events) {
