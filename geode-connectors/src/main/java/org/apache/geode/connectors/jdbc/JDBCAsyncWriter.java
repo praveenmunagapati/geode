@@ -32,13 +32,9 @@ import org.apache.logging.log4j.Logger;
  * @since Geode 1.4
  */
 public class JDBCAsyncWriter implements AsyncEventListener {
-
   static final Logger logger = LogService.getLogger();
-
   private long totalEvents = 0;
-
   private long successfulEvents = 0;
-
   private JDBCManager manager;
 
   @Override
