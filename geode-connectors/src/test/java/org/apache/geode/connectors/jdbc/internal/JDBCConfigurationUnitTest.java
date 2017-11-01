@@ -12,12 +12,13 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.geode.connectors.jdbc;
+package org.apache.geode.connectors.jdbc.internal;
 
 import static org.assertj.core.api.Assertions.*;
 
 import java.util.Properties;
 
+import org.apache.geode.connectors.jdbc.internal.JDBCConfiguration;
 import org.apache.geode.test.junit.categories.UnitTest;
 import org.junit.*;
 import org.junit.experimental.categories.Category;

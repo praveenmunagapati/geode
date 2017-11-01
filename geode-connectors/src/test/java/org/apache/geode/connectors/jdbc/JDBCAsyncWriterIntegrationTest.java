@@ -105,13 +105,6 @@ public class JDBCAsyncWriterIntegrationTest {
   }
 
   @Test
-  public void canExecuteSQLOnDataBase() throws Exception {
-    stmt.execute("Create Table blobTable" + " (testfield BLOB)");
-    stmt.execute("Insert into blobTable values ('1', 'emp1', 10)");
-    stmt.execute("Select * from blobTable");
-  }
-
-  @Test
   public void validateJDBCAsyncWriterTotalEvents() {
     Region employees = createRegionWithJDBCAsyncWriter(regionTableName, getRequiredProperties());
     PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")

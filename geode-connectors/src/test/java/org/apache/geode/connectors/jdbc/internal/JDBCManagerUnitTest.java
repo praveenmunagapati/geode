@@ -12,7 +12,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.geode.connectors.jdbc;
+package org.apache.geode.connectors.jdbc.internal;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -35,6 +35,8 @@ import org.mockito.ArgumentCaptor;
 
 import org.apache.geode.cache.Operation;
 import org.apache.geode.cache.Region;
+import org.apache.geode.connectors.jdbc.internal.JDBCConfiguration;
+import org.apache.geode.connectors.jdbc.internal.JDBCManager;
 import org.apache.geode.internal.cache.GemFireCacheImpl;
 import org.apache.geode.pdx.PdxInstance;
 import org.apache.geode.pdx.PdxInstanceFactory;

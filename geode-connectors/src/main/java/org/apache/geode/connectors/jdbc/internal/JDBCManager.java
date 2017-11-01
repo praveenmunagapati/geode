@@ -12,7 +12,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.geode.connectors.jdbc;
+package org.apache.geode.connectors.jdbc.internal;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -56,7 +56,7 @@ public class JDBCManager {
     return result;
   }
 
-  JDBCManager(JDBCConfiguration config) {
+  public JDBCManager(JDBCConfiguration config) {
     this.config = config;
   }
 

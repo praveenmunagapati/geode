@@ -20,6 +20,8 @@ import java.util.Properties;
 import org.apache.geode.cache.asyncqueue.AsyncEvent;
 import org.apache.geode.cache.asyncqueue.AsyncEventListener;
 import org.apache.geode.cache.query.internal.DefaultQuery;
+import org.apache.geode.connectors.jdbc.internal.JDBCConfiguration;
+import org.apache.geode.connectors.jdbc.internal.JDBCManager;
 import org.apache.geode.internal.logging.LogService;
 import org.apache.geode.pdx.PdxInstance;
 import org.apache.logging.log4j.Logger;

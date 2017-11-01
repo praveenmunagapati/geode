@@ -12,7 +12,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.geode.connectors.jdbc;
+package org.apache.geode.connectors.jdbc.internal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +43,7 @@ public class JDBCConfiguration {
   private final String user;
   private final String password;
 
-  JDBCConfiguration(Properties configProps) {
+  public JDBCConfiguration(Properties configProps) {
     validateKnownProperties(configProps);
     validateRequiredProperties(configProps);
     this.driver = configProps.getProperty(DRIVER);
