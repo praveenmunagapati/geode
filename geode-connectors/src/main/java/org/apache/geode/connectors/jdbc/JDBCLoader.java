@@ -36,7 +36,13 @@ public class JDBCLoader<K, V> implements CacheLoader<K, V> {
 
   @SuppressWarnings("unchecked")
   @Override
+  /**
+   * @return this method always returns a PdxInstance. It does not matter what the V generic
+   *         parameter is set to.
+   */
   public V load(LoaderHelper<K, V> helper) throws CacheLoaderException {
+    // The following cast to V is to keep the compiler happy
+    // but is erased at runtime and no actual cast happens.
     return (V) this.manager.read(helper.getRegion(), helper.getKey());
   }
 
