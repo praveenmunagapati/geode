@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.IntPredicate;
+import java.util.function.Function;
 
 public class JDBCConfiguration {
   private static final String URL = "url";
@@ -77,34 +77,22 @@ public class JDBCConfiguration {
   }
 
   private String computeDefaultValueClassName(String valueClassNameProp) {
-    return parseDefault(VALUE_CLASS_NAME, valueClassNameProp, v -> {
-      return v;
-    }, null);
+    return parseDefault(VALUE_CLASS_NAME, valueClassNameProp, v -> v, null);
   }
 
   private Map<String, String> computeRegionToClassMap(String valueClassNameProp) {
-    return parseMap(valueClassNameProp, v -> {
-      return v;
-    });
+    return parseMap(valueClassNameProp, v -> v);
   }
 
   private boolean computeDefaultKeyPartOfValue(String keyPartOfValueProp) {
-    return parseDefault(IS_KEY_PART_OF_VALUE, keyPartOfValueProp, v -> {
-      return Boolean.parseBoolean(v);
-    }, false);
+    return parseDefault(IS_KEY_PART_OF_VALUE, keyPartOfValueProp, Boolean::parseBoolean, false);
   }
 
   private Map<String, Boolean> computeKeyPartOfValueMap(String keyPartOfValueProp) {
-    return parseMap(keyPartOfValueProp, v -> {
-      return Boolean.parseBoolean(v);
-    });
+    return parseMap(keyPartOfValueProp, Boolean::parseBoolean);
   }
 
-  public interface ValueParser<V> {
-    public V parseValue(String valueString);
-  }
-
-  private <V> Map<String, V> parseMap(String propertyValue, ValueParser<V> parser) {
+  private <V> Map<String, V> parseMap(String propertyValue, Function<String, V> parser) {
     if (propertyValue == null) {
       return null;
     }
@@ -117,12 +105,12 @@ public class JDBCConfiguration {
       }
       String regionName = item.substring(0, idx);
       String valueString = item.substring(idx + getJdbcRegionSeparator().length());;
-      result.put(regionName, parser.parseValue(valueString));
+      result.put(regionName, parser.apply(valueString));
     }
     return result;
   }
 
-  private <V> V parseDefault(String propertyName, String propertyValue, ValueParser<V> parser,
+  private <V> V parseDefault(String propertyName, String propertyValue, Function<String, V> parser,
       V defaultValue) {
     if (propertyValue == null) {
       return defaultValue;
@@ -139,7 +127,7 @@ public class JDBCConfiguration {
             propertyName + " can have at most one item that does not have a "
                 + getJdbcRegionSeparator() + " in it.");
       }
-      result = parser.parseValue(item);
+      result = parser.apply(item);
     }
     if (result == null) {
       result = defaultValue;

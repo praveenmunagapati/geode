@@ -20,10 +20,14 @@ import static org.apache.geode.distributed.ConfigurationProperties.MCAST_PORT;
 import static org.assertj.core.api.Assertions.*;
 
 import java.sql.*;
+import java.util.HashMap;
 import java.util.Properties;
 
 import org.junit.*;
 import org.junit.experimental.categories.Category;
+
+import com.sun.javafx.collections.MappingChange.Map;
+
 import org.apache.geode.cache.Cache;
 import org.apache.geode.cache.CacheFactory;
 import org.apache.geode.cache.Region;
@@ -113,6 +117,31 @@ public class JDBCSynchronousWriterIntegrationTest {
         .writeInt("age", 21).create();
     employees.put("1", pdx1);
     employees.put("2", pdx2);
+
+    ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
+    assertThat(rs.next()).isTrue();
+    assertThat(rs.getString("id")).isEqualTo("1");
+    assertThat(rs.getString("name")).isEqualTo("Emp1");
+    assertThat(rs.getObject("age")).isEqualTo(55);
+    assertThat(rs.next()).isTrue();
+    assertThat(rs.getString("id")).isEqualTo("2");
+    assertThat(rs.getString("name")).isEqualTo("Emp2");
+    assertThat(rs.getObject("age")).isEqualTo(21);
+    assertThat(rs.next()).isFalse();
+  }
+
+  @Test
+  public void canPutAllInsertIntoTable() throws Exception {
+    Region employees =
+        createRegionWithJDBCSynchronousWriter(regionTableName, getRequiredProperties());
+    PdxInstance pdx1 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp1")
+        .writeInt("age", 55).create();
+    PdxInstance pdx2 = cache.createPdxInstanceFactory("Employee").writeString("name", "Emp2")
+        .writeInt("age", 21).create();
+    HashMap putAllMap = new HashMap();
+    putAllMap.put("1", pdx1);
+    putAllMap.put("2", pdx2);
+    employees.putAll(putAllMap);
 
     ResultSet rs = stmt.executeQuery("select * from " + regionTableName + " order by id asc");
     assertThat(rs.next()).isTrue();

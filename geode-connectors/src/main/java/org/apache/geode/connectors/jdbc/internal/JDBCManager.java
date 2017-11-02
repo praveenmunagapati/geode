@@ -171,14 +171,13 @@ public class JDBCManager {
     }
   }
 
-  private String getQueryString(String tableName, List<ColumnValue> columnList,
-      Operation operation) {
+  private String getSqlString(String tableName, List<ColumnValue> columnList, Operation operation) {
     if (operation.isCreate()) {
-      return getInsertQueryString(tableName, columnList);
+      return getInsertSqlString(tableName, columnList);
     } else if (operation.isUpdate()) {
-      return getUpdateQueryString(tableName, columnList);
+      return getUpdateSqlString(tableName, columnList);
     } else if (operation.isDestroy()) {
-      return getDestroyQueryString(tableName, columnList);
+      return getDestroySqlString(tableName, columnList);
     } else if (operation.isGet()) {
       return getSelectQueryString(tableName, columnList);
     } else {
@@ -195,7 +194,7 @@ public class JDBCManager {
     return query.toString();
   }
 
-  private String getDestroyQueryString(String tableName, List<ColumnValue> columnList) {
+  private String getDestroySqlString(String tableName, List<ColumnValue> columnList) {
     assert columnList.size() == 1;
     ColumnValue keyCV = columnList.get(0);
     assert keyCV.isKey();
@@ -204,7 +203,7 @@ public class JDBCManager {
     return query.toString();
   }
 
-  private String getUpdateQueryString(String tableName, List<ColumnValue> columnList) {
+  private String getUpdateSqlString(String tableName, List<ColumnValue> columnList) {
     StringBuilder query = new StringBuilder("UPDATE " + tableName + " SET ");
     int idx = 0;
     for (ColumnValue cv : columnList) {
@@ -222,7 +221,7 @@ public class JDBCManager {
     return query.toString();
   }
 
-  private String getInsertQueryString(String tableName, List<ColumnValue> columnList) {
+  private String getInsertSqlString(String tableName, List<ColumnValue> columnList) {
     StringBuilder columnNames = new StringBuilder("INSERT INTO " + tableName + '(');
     StringBuilder columnValues = new StringBuilder(" VALUES (");
     int columnCount = columnList.size();
@@ -311,11 +310,11 @@ public class JDBCManager {
         + " columns: " + columnList);
     StatementKey key = new StatementKey(pdxTypeId, operation, tableName);
     return getPreparedStatementCache().computeIfAbsent(key, k -> {
-      String query = getQueryString(tableName, columnList, operation);
-      System.out.println("query=" + query); // TODO remove debugging
+      String sqlStr = getSqlString(tableName, columnList, operation);
+      System.out.println("sql=" + sqlStr); // TODO remove debugging
       Connection con = getConnection(null, null);
       try {
-        return con.prepareStatement(query);
+        return con.prepareStatement(sqlStr);
       } catch (SQLException e) {
         handleSQLException(e);
         return null; // this line is never reached
