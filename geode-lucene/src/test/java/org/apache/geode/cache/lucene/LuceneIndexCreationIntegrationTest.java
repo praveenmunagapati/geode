@@ -208,6 +208,23 @@ public class LuceneIndexCreationIntegrationTest extends LuceneIntegrationTest {
     assertEquals(Collections.singletonList("key1"), query.findKeys());
   }
 
+
+  @Test()
+  public void creatingDuplicateLuceneIndexFails()
+      throws IOException, ParseException, InterruptedException, LuceneQueryException {
+    Region region = createRegion();
+    LuceneService luceneService = LuceneServiceProvider.get(cache);
+    final LuceneIndexFactoryImpl indexFactory =
+        (LuceneIndexFactoryImpl) luceneService.createIndexFactory();
+    indexFactory.setFields("field1", "field2").create(INDEX_NAME, REGION_NAME, true);
+
+    LuceneIndex index = luceneService.getIndex(INDEX_NAME, REGION_NAME);
+    assertNotNull(index);
+
+    expectedException.expect(LuceneIndexExistsException.class);
+    indexFactory.setFields("field1", "field2").create(INDEX_NAME, REGION_NAME, true);
+  }
+
   @Test
   public void cannotCreateLuceneIndexForReplicateRegion() throws IOException, ParseException {
     try {
