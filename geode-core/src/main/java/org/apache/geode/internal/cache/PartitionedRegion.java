@@ -1221,8 +1221,7 @@ public class PartitionedRegion extends LocalRegion
     addAsyncEventQueueId(asyncEventQueueId, false);
   }
 
-  public void addAsyncEventQueueId(
-      String asyncEventQueueId, boolean isInternal) {
+  public void addAsyncEventQueueId(String asyncEventQueueId, boolean isInternal) {
     super.addAsyncEventQueueId(asyncEventQueueId, isInternal);
     new UpdateAttributesProcessor(this).distribute();
     ((PartitionedRegion) this).distributeUpdatedProfileOnSenderCreation();

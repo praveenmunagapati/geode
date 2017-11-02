@@ -874,7 +874,7 @@ public abstract class AbstractRegion implements InternalRegion, AttributesMutato
 
   public void addAsyncEventQueueId(String asyncEventQueueId, boolean isInternal) {
     getAsyncEventQueueIds().add(asyncEventQueueId);
-    if(!isInternal) {
+    if (!isInternal) {
       getVisibleAsyncEventQueueIds().add(asyncEventQueueId);
     }
     setAllGatewaySenderIds();

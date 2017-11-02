@@ -542,7 +542,8 @@ public class LocalRegion extends AbstractRegion implements InternalRegion, Loade
     return this.stopper;
   }
 
-  private final CopyOnWriteHashMap<String, CacheServiceProfile> cacheServiceProfiles = new CopyOnWriteHashMap<>();
+  private final CopyOnWriteHashMap<String, CacheServiceProfile> cacheServiceProfiles =
+      new CopyOnWriteHashMap<>();
 
   private static String calcFullPath(String regionName, LocalRegion parentRegion) {
     StringBuilder buf = null;
@@ -635,7 +636,7 @@ public class LocalRegion extends AbstractRegion implements InternalRegion, Loade
     this.isUsedForParallelGatewaySenderQueue =
         internalRegionArgs.isUsedForParallelGatewaySenderQueue();
     this.serialGatewaySender = internalRegionArgs.getSerialGatewaySender();
-    if(internalRegionArgs.getCacheServiceProfiles() != null) {
+    if (internalRegionArgs.getCacheServiceProfiles() != null) {
       this.cacheServiceProfiles.putAll(internalRegionArgs.getCacheServiceProfiles());
     }
 

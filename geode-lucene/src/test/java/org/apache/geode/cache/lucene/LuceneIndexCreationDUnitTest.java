@@ -262,7 +262,8 @@ public class LuceneIndexCreationDUnitTest extends LuceneDUnitTest {
 
   @Test
   @Parameters({"PARTITION", "PARTITION_REDUNDANT"})
-  public void creatingIndexAfterRegionAndStartingUpSecondMemberSucceeds(RegionTestableType regionType) {
+  public void creatingIndexAfterRegionAndStartingUpSecondMemberSucceeds(
+      RegionTestableType regionType) {
     dataStore1.invoke(() -> {
       regionType.createDataStore(getCache(), REGION_NAME);
       createIndexAfterRegion("field1");
@@ -279,7 +280,8 @@ public class LuceneIndexCreationDUnitTest extends LuceneDUnitTest {
 
   @Test()
   @Parameters({"PARTITION", "PARTITION_REDUNDANT"})
-  public void creatingIndexAfterRegionAndStartingUpSecondMemberWithoutIndexFails(RegionTestableType regionType) {
+  public void creatingIndexAfterRegionAndStartingUpSecondMemberWithoutIndexFails(
+      RegionTestableType regionType) {
     dataStore1.invoke(() -> {
       regionType.createDataStore(getCache(), REGION_NAME);
       createIndexAfterRegion("field1");
@@ -616,24 +618,21 @@ public class LuceneIndexCreationDUnitTest extends LuceneDUnitTest {
     assertEquals(expectedSize, getCache().getAsyncEventQueues(false).size());
   }
 
-  private void createIndexAfterRegion(String ... fields) {
+  private void createIndexAfterRegion(String... fields) {
     LuceneService luceneService = LuceneServiceProvider.get(getCache());
     LuceneIndexFactoryImpl indexFactory =
         (LuceneIndexFactoryImpl) luceneService.createIndexFactory();
     indexFactory.setFields(fields).create(INDEX_NAME, REGION_NAME, true);
   }
 
-  private void putEntryAndQuery()
-      throws InterruptedException, LuceneQueryException {
+  private void putEntryAndQuery() throws InterruptedException, LuceneQueryException {
     Cache cache = getCache();
     Region region = cache.getRegion(REGION_NAME);
     region.put("key1", new TestObject("field1Value", "field2Value"));
     LuceneService luceneService = LuceneServiceProvider.get(cache);
     luceneService.waitUntilFlushed(INDEX_NAME, REGION_NAME, 1, TimeUnit.MINUTES);
-    LuceneQuery<Object, Object>
-        query =
-        luceneService.createLuceneQueryFactory()
-            .create(INDEX_NAME, REGION_NAME, "field1:field1Value", "field1");
+    LuceneQuery<Object, Object> query = luceneService.createLuceneQueryFactory().create(INDEX_NAME,
+        REGION_NAME, "field1:field1Value", "field1");
     assertEquals(Collections.singletonList("key1"), query.findKeys());
   }
 

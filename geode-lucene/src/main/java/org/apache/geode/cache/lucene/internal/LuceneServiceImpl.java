@@ -250,16 +250,16 @@ public class LuceneServiceImpl implements InternalLuceneService {
 
   }
 
-  private void createIndexOnExistingRegion(PartitionedRegion region, String indexName, String regionPath,
-      String[] fields, Analyzer analyzer, Map<String, Analyzer> fieldAnalyzers,
+  private void createIndexOnExistingRegion(PartitionedRegion region, String indexName,
+      String regionPath, String[] fields, Analyzer analyzer, Map<String, Analyzer> fieldAnalyzers,
       LuceneSerializer serializer) {
     validateRegionAttributes(region.getAttributes());
 
     String aeqId = LuceneServiceImpl.getUniqueIndexName(indexName, regionPath);
     region.addAsyncEventQueueId(aeqId, true);
 
-    region.addCacheServiceProfile(new LuceneIndexCreationProfile(indexName, regionPath,
-        fields, analyzer, fieldAnalyzers, serializer));
+    region.addCacheServiceProfile(new LuceneIndexCreationProfile(indexName, regionPath, fields,
+        analyzer, fieldAnalyzers, serializer));
 
     LuceneIndexImpl luceneIndex = beforeDataRegionCreated(indexName, regionPath,
         region.getAttributes(), analyzer, fieldAnalyzers, aeqId, serializer, fields);

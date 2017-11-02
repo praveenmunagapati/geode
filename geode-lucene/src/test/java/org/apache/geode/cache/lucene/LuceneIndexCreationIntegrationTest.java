@@ -200,10 +200,8 @@ public class LuceneIndexCreationIntegrationTest extends LuceneIntegrationTest {
 
     region.put("key1", new TestObject("hello", "world"));
     luceneService.waitUntilFlushed(INDEX_NAME, REGION_NAME, 1, TimeUnit.MINUTES);
-    LuceneQuery<Object, Object>
-        query =
-        luceneService.createLuceneQueryFactory()
-            .create(INDEX_NAME, REGION_NAME, "field1:hello", "field1");
+    LuceneQuery<Object, Object> query = luceneService.createLuceneQueryFactory().create(INDEX_NAME,
+        REGION_NAME, "field1:hello", "field1");
 
     assertEquals(Collections.singletonList("key1"), query.findKeys());
   }
