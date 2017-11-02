@@ -32,7 +32,10 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 
+import org.apache.geode.cache.AttributesFactory;
 import org.apache.geode.cache.Cache;
+import org.apache.geode.cache.EvictionAlgorithm;
+import org.apache.geode.cache.EvictionAttributes;
 import org.apache.geode.cache.Region;
 import org.apache.geode.cache.RegionAttributes;
 import org.apache.geode.cache.asyncqueue.internal.AsyncEventQueueImpl;
@@ -202,20 +205,21 @@ public class LuceneServiceImpl implements InternalLuceneService {
   }
 
   public void createIndex(String indexName, String regionPath, Map<String, Analyzer> fieldAnalyzers,
-      LuceneSerializer serializer) {
+      LuceneSerializer serializer, boolean allowOnExistingRegion) {
     if (fieldAnalyzers == null || fieldAnalyzers.isEmpty()) {
       throw new IllegalArgumentException("At least one field must be indexed");
     }
     Analyzer analyzer = new PerFieldAnalyzerWrapper(new StandardAnalyzer(), fieldAnalyzers);
     Set<String> fieldsSet = fieldAnalyzers.keySet();
-    String[] fields = (String[]) fieldsSet.toArray(new String[fieldsSet.size()]);
+    String[] fields = fieldsSet.toArray(new String[fieldsSet.size()]);
 
-    createIndex(indexName, regionPath, analyzer, fieldAnalyzers, serializer, fields);
+    createIndex(indexName, regionPath, analyzer, fieldAnalyzers, serializer, allowOnExistingRegion,
+        fields);
   }
 
   public void createIndex(final String indexName, String regionPath, final Analyzer analyzer,
       final Map<String, Analyzer> fieldAnalyzers, final LuceneSerializer serializer,
-      final String... fields) {
+      boolean allowOnExistingRegion, final String... fields) {
 
     if (!regionPath.startsWith("/")) {
       regionPath = "/" + regionPath;
@@ -225,13 +229,60 @@ public class LuceneServiceImpl implements InternalLuceneService {
         regionPath, fields, analyzer, fieldAnalyzers, serializer));
 
     Region region = cache.getRegion(regionPath);
-    if (region != null) {
+
+    LuceneRegionListener regionListener = new LuceneRegionListener(this, cache, indexName,
+        regionPath, fields, analyzer, fieldAnalyzers, serializer);
+    if (region == null) {
+      cache.addRegionListener(regionListener);
+      return;
+    }
+
+    if (!allowOnExistingRegion) {
       definedIndexMap.remove(LuceneServiceImpl.getUniqueIndexName(indexName, regionPath));
       throw new IllegalStateException("The lucene index must be created before region");
     }
 
-    cache.addRegionListener(new LuceneRegionListener(this, cache, indexName, regionPath, fields,
-        analyzer, fieldAnalyzers, serializer));
+
+    createIndexOnExistingRegion(region, indexName, regionPath, fields, analyzer, fieldAnalyzers,
+        serializer);
+
+  }
+
+  private void createIndexOnExistingRegion(Region region, String indexName, String regionPath,
+      String[] fields, Analyzer analyzer, Map<String, Analyzer> fieldAnalyzers,
+      LuceneSerializer serializer) {
+    validateRegionAttributes(region.getAttributes());
+
+    String aeqId = LuceneServiceImpl.getUniqueIndexName(indexName, regionPath);
+    region.getAttributesMutator().addAsyncEventQueueId(aeqId);
+
+    // Add index creation profile
+    internalRegionArgs.addCacheServiceProfile(new LuceneIndexCreationProfile(indexName, regionPath,
+        fields, analyzer, fieldAnalyzers, serializer));
+
+    LuceneIndexImpl luceneIndex = beforeDataRegionCreated(indexName, regionPath,
+        region.getAttributes(), analyzer, fieldAnalyzers, aeqId, serializer, fields);
+
+    // Add internal async event id
+    internalRegionArgs.addInternalAsyncEventQueueId(aeqId);
+  }
+
+  static void validateRegionAttributes(RegionAttributes attrs) {
+    if (!attrs.getDataPolicy().withPartitioning()) {
+      // replicated region
+      throw new UnsupportedOperationException(
+          "Lucene indexes on replicated regions are not supported");
+    }
+
+    // For now we cannot support eviction with local destroy.
+    // Eviction with overflow to disk still needs to be supported
+    EvictionAttributes evictionAttributes = attrs.getEvictionAttributes();
+    EvictionAlgorithm evictionAlgorithm = evictionAttributes.getAlgorithm();
+    if (evictionAlgorithm != EvictionAlgorithm.NONE
+        && evictionAttributes.getAction().isLocalDestroy()) {
+      throw new UnsupportedOperationException(
+          "Lucene indexes on regions with eviction and action local destroy are not supported");
+    }
   }
 
   /**

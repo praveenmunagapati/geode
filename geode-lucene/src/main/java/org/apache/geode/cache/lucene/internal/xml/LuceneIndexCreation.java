@@ -17,7 +17,6 @@ package org.apache.geode.cache.lucene.internal.xml;
 
 import java.util.*;
 
-import org.apache.geode.cache.Declarable;
 import org.apache.geode.cache.lucene.LuceneIndexExistsException;
 import org.apache.geode.cache.lucene.LuceneSerializer;
 import org.apache.geode.internal.i18n.LocalizedStrings;
@@ -100,7 +99,7 @@ public class LuceneIndexCreation implements LuceneIndex, Extension<Region<?, ?>>
         : new PerFieldAnalyzerWrapper(new StandardAnalyzer(), this.fieldAnalyzers);
     try {
       service.createIndex(getName(), getRegionPath(), analyzer, this.fieldAnalyzers,
-          getLuceneSerializer(), getFieldNames());
+          getLuceneSerializer(), false, getFieldNames());
     } catch (LuceneIndexExistsException e) {
       logger
           .info(LocalizedStrings.LuceneIndexCreation_IGNORING_DUPLICATE_INDEX_CREATION_0_ON_REGION_1

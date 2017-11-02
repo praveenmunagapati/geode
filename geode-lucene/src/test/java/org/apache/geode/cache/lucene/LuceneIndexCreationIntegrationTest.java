@@ -39,6 +39,7 @@ import org.apache.geode.cache.Region;
 import org.apache.geode.cache.RegionFactory;
 import org.apache.geode.cache.RegionShortcut;
 import org.apache.geode.cache.lucene.internal.LuceneIndexCreationProfile;
+import org.apache.geode.cache.lucene.internal.LuceneIndexFactoryImpl;
 import org.apache.geode.cache.lucene.internal.LuceneIndexImplFactory;
 import org.apache.geode.cache.lucene.internal.LuceneRawIndex;
 import org.apache.geode.cache.lucene.internal.LuceneRawIndexFactory;
@@ -182,6 +183,15 @@ public class LuceneIndexCreationIntegrationTest extends LuceneIntegrationTest {
       throws IOException, ParseException {
     createRegion();
     createIndex("field1", "field2", "field3");
+  }
+
+  @Test()
+  public void canCreateLuceneIndexAfterRegionCreatedIfAllowFlagIsSet()
+      throws IOException, ParseException {
+    createRegion();
+    final LuceneIndexFactoryImpl indexFactory =
+        (LuceneIndexFactoryImpl) LuceneServiceProvider.get(cache).createIndexFactory();
+    indexFactory.setFields("field1", "field2").create(INDEX_NAME, REGION_NAME, true);
   }
 
   @Test
