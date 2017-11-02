@@ -74,10 +74,10 @@ public class JDBCManager {
         ResultSet rs = pstmt.executeQuery();
         if (rs.next()) {
           InternalCache cache = (InternalCache) region.getRegionService();
-          String objectClassName = getObjectClassName(tableName);
+          String valueClassName = getValueClassName(region.getName());
           PdxInstanceFactory factory;
-          if (objectClassName != null) {
-            factory = cache.createPdxInstanceFactory(objectClassName);
+          if (valueClassName != null) {
+            factory = cache.createPdxInstanceFactory(valueClassName);
           } else {
             factory = cache.createPdxInstanceFactory("no class", false);
           }
@@ -110,9 +110,8 @@ public class JDBCManager {
     }
   }
 
-  private String getObjectClassName(String tableName) {
-    // TODO NYI
-    return null;
+  private String getValueClassName(String regionName) {
+    return this.config.getValueClassName(regionName);
   }
 
   public void write(Region region, Operation operation, Object key, PdxInstance value) {

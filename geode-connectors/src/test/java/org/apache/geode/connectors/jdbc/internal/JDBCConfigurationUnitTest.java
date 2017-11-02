@@ -14,10 +14,13 @@
  */
 package org.apache.geode.connectors.jdbc.internal;
 
+import static com.googlecode.catchexception.CatchException.catchException;
+import static com.googlecode.catchexception.CatchException.caughtException;
 import static org.assertj.core.api.Assertions.*;
 
 import java.util.Properties;
 
+import org.apache.geode.cache.Operation;
 import org.apache.geode.connectors.jdbc.internal.JDBCConfiguration;
 import org.apache.geode.test.junit.categories.UnitTest;
 import org.junit.*;
@@ -61,7 +64,7 @@ public class JDBCConfigurationUnitTest {
     Properties props = new Properties();
     props.setProperty("url", "");
     JDBCConfiguration config = new JDBCConfiguration(props);
-    assertThat(config.getUser()).isEqualTo(null);
+    assertThat(config.getUser()).isNull();
   }
 
   @Test
@@ -69,7 +72,7 @@ public class JDBCConfigurationUnitTest {
     Properties props = new Properties();
     props.setProperty("url", "");
     JDBCConfiguration config = new JDBCConfiguration(props);
-    assertThat(config.getPassword()).isEqualTo(null);
+    assertThat(config.getPassword()).isNull();
   }
 
   @Test
@@ -89,4 +92,41 @@ public class JDBCConfigurationUnitTest {
     JDBCConfiguration config = new JDBCConfiguration(props);
     assertThat(config.getPassword()).isEqualTo("myPassword");
   }
+
+  @Test
+  public void testDefaultValueClassName() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getValueClassName("foo")).isNull();
+  }
+
+  @Test
+  public void testValueClassName() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("valueClassName", "myPackage.myDomainClass");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getValueClassName("foo")).isEqualTo("myPackage.myDomainClass");
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyThatTwoClassNamesWithNoRegionNameThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("valueClassName", "myClass1, myClass2");
+    new JDBCConfiguration(props);
+  }
+
+  @Test
+  public void testValueClassNameWithRegionNames() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("valueClassName", "reg1:cn1   , reg2:pack2.cn2,myPackage.myDomainClass");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getValueClassName("foo")).isEqualTo("myPackage.myDomainClass");
+    assertThat(config.getValueClassName("reg1")).isEqualTo("cn1");
+    assertThat(config.getValueClassName("reg2")).isEqualTo("pack2.cn2");
+  }
+
 }

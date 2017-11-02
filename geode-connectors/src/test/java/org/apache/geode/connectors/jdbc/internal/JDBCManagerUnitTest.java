@@ -164,7 +164,7 @@ public class JDBCManagerUnitTest {
   @After
   public void tearDown() throws Exception {}
 
-  private void createManager(String url) throws SQLException {
+  private void createManager(String url, String valueClassName) throws SQLException {
     ResultSet rsKeys = mock(ResultSet.class);
     when(rsKeys.next()).thenReturn(true, false);
     when(rsKeys.getString("COLUMN_NAME")).thenReturn(ID_COLUMN_NAME);
@@ -173,30 +173,34 @@ public class JDBCManagerUnitTest {
     when(rs.next()).thenReturn(true, false);
     when(rs.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
 
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(url), rs, rsKeys, null);
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(url, valueClassName), rs,
+        rsKeys, null);
   }
 
   private void createDefaultManager() throws SQLException {
-    createManager("fakeURL");
+    createManager("fakeURL", null);
   }
 
   private void createUpsertManager() {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL"));
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL", null));
   }
 
   private void createUpsertManager(int upsertReturn) {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL"), upsertReturn);
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL", null), upsertReturn);
   }
 
   private void createManager(ResultSet tableNames, ResultSet primaryKeys,
       ResultSet queryResultSet) {
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration("fakeURL"), tableNames,
-        primaryKeys, queryResultSet);
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration("fakeURL", null),
+        tableNames, primaryKeys, queryResultSet);
   }
 
-  private JDBCConfiguration createConfiguration(String url) {
+  private JDBCConfiguration createConfiguration(String url, String valueClassName) {
     Properties props = new Properties();
     props.setProperty("url", url);
+    if (valueClassName != null) {
+      props.setProperty("valueClassName", valueClassName);
+    }
     return new JDBCConfiguration(props);
   }
 
@@ -520,6 +524,35 @@ public class JDBCManagerUnitTest {
     PdxInstance pi = mock(PdxInstance.class);
     when(factory.create()).thenReturn(pi);
     when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+
+    Region region = Fakes.region(regionName, cache);
+    Object key = "1";
+    PdxInstance value = this.mgr.read(region, key);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .isEqualTo("SELECT * FROM " + regionName + " WHERE " + ID_COLUMN_NAME + " = ?");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(1)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("1");
+    assertThat(value).isSameAs(pi);
+    ArgumentCaptor<String> fieldNameCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> fieldValueCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(factory, times(2)).writeField(fieldNameCaptor.capture(), fieldValueCaptor.capture(),
+        any());
+    assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("name", "age"));
+    assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
+  }
+
+  @Test
+  public void verifyReadWithValueClassName() throws SQLException {
+    createManager("myUrl", regionName + ":myValueClass");
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("myValueClass")).thenReturn(factory);
 
     Region region = Fakes.region(regionName, cache);
     Object key = "1";
