@@ -14,13 +14,10 @@
  */
 package org.apache.geode.connectors.jdbc.internal;
 
-import static com.googlecode.catchexception.CatchException.catchException;
-import static com.googlecode.catchexception.CatchException.caughtException;
 import static org.assertj.core.api.Assertions.*;
 
 import java.util.Properties;
 
-import org.apache.geode.cache.Operation;
 import org.apache.geode.connectors.jdbc.internal.JDBCConfiguration;
 import org.apache.geode.test.junit.categories.UnitTest;
 import org.junit.*;
@@ -129,4 +126,65 @@ public class JDBCConfigurationUnitTest {
     assertThat(config.getValueClassName("reg2")).isEqualTo("pack2.cn2");
   }
 
+  @Test
+  public void testDefaultIsKeyPartOfValue() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getIsKeyPartOfValue("foo")).isEqualTo(false);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyThatTwoDefaultsKeyPartOfValueThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("isKeyPartOfValue", "true, reg1:true   , reg2:false, true");
+    new JDBCConfiguration(props);
+  }
+
+  @Test
+  public void testIsKeyPartOfValueWithRegionNames() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("isKeyPartOfValue", "true, reg1:true   , reg2:false,");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getIsKeyPartOfValue("foo")).isEqualTo(true);
+    assertThat(config.getIsKeyPartOfValue("reg1")).isEqualTo(true);
+    assertThat(config.getIsKeyPartOfValue("reg2")).isEqualTo(false);
+  }
+
+  @Test
+  public void testIsKeyPartOfValueWithJdbcRegionSeparator() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("isKeyPartOfValue", "true, reg1->true   , reg2->false");
+    JDBCConfiguration config = new TestableJDBCConfiguration(props);
+    assertThat(config.getIsKeyPartOfValue("foo")).isEqualTo(true);
+    assertThat(config.getIsKeyPartOfValue("reg1")).isEqualTo(true);
+    assertThat(config.getIsKeyPartOfValue("reg2")).isEqualTo(false);
+  }
+
+
+  @Test
+  public void testIsKeyPartOfValueWithJdbcRegionSeparatorNoDefaultValue() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("isKeyPartOfValue", "reg1->true,reg2->false");
+    JDBCConfiguration config = new TestableJDBCConfiguration(props);
+    assertThat(config.getIsKeyPartOfValue("foo")).isEqualTo(false);
+    assertThat(config.getIsKeyPartOfValue("reg1")).isEqualTo(true);
+    assertThat(config.getIsKeyPartOfValue("reg2")).isEqualTo(false);
+  }
+
+
+  public static class TestableJDBCConfiguration extends JDBCConfiguration {
+    public TestableJDBCConfiguration(Properties configProps) {
+      super(configProps);
+    }
+
+    @Override
+    protected String getJdbcRegionSeparator() {
+      return "->";
+    }
+  }
 }

@@ -164,7 +164,7 @@ public class JDBCManagerUnitTest {
   @After
   public void tearDown() throws Exception {}
 
-  private void createManager(String url, String valueClassName) throws SQLException {
+  private void createManager(String... args) throws SQLException {
     ResultSet rsKeys = mock(ResultSet.class);
     when(rsKeys.next()).thenReturn(true, false);
     when(rsKeys.getString("COLUMN_NAME")).thenReturn(ID_COLUMN_NAME);
@@ -173,33 +173,36 @@ public class JDBCManagerUnitTest {
     when(rs.next()).thenReturn(true, false);
     when(rs.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
 
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(url, valueClassName), rs,
-        rsKeys, null);
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(args), rs, rsKeys, null);
   }
 
   private void createDefaultManager() throws SQLException {
-    createManager("fakeURL", null);
+    createManager();
   }
 
   private void createUpsertManager() {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL", null));
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration());
   }
 
   private void createUpsertManager(int upsertReturn) {
-    this.mgr = new TestableUpsertJDBCManager(createConfiguration("fakeURL", null), upsertReturn);
+    this.mgr = new TestableUpsertJDBCManager(createConfiguration(), upsertReturn);
   }
 
-  private void createManager(ResultSet tableNames, ResultSet primaryKeys,
-      ResultSet queryResultSet) {
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration("fakeURL", null),
-        tableNames, primaryKeys, queryResultSet);
+  private void createManager(ResultSet tableNames, ResultSet primaryKeys, ResultSet queryResultSet,
+      String... args) {
+    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(args), tableNames,
+        primaryKeys, queryResultSet);
   }
 
-  private JDBCConfiguration createConfiguration(String url, String valueClassName) {
+  private JDBCConfiguration createConfiguration(String... args) {
     Properties props = new Properties();
-    props.setProperty("url", url);
-    if (valueClassName != null) {
-      props.setProperty("valueClassName", valueClassName);
+    props.setProperty("url", "fakeURL");
+    String[] argsArray = args;
+    if (argsArray != null) {
+      assert argsArray.length % 2 == 0;
+      for (int i = 0; i < argsArray.length; i += 2) {
+        props.setProperty(argsArray[i], argsArray[i + 1]);
+      }
     }
     return new JDBCConfiguration(props);
   }
@@ -547,7 +550,7 @@ public class JDBCManagerUnitTest {
 
   @Test
   public void verifyReadWithValueClassName() throws SQLException {
-    createManager("myUrl", regionName + ":myValueClass");
+    createManager("valueClassName", regionName + ":myValueClass");
     GemFireCacheImpl cache = Fakes.cache();
     PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
     PdxInstance pi = mock(PdxInstance.class);
@@ -572,5 +575,35 @@ public class JDBCManagerUnitTest {
         any());
     assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("name", "age"));
     assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
+  }
+
+  @Test
+  public void verifyReadWithKeyPartOfValue() throws SQLException {
+    createManager("isKeyPartOfValue", "true");
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+
+    Region region = Fakes.region(regionName, cache);
+    Object key = "1";
+    PdxInstance value = this.mgr.read(region, key);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .isEqualTo("SELECT * FROM " + regionName + " WHERE " + ID_COLUMN_NAME + " = ?");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(1)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("1");
+    assertThat(value).isSameAs(pi);
+    ArgumentCaptor<String> fieldNameCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> fieldValueCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(factory, times(3)).writeField(fieldNameCaptor.capture(), fieldValueCaptor.capture(),
+        any());
+    assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("id", "name", "age"));
+    assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("1", "Emp1", 21));
+
   }
 }

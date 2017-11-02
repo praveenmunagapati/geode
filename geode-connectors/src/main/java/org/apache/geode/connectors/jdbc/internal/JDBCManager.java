@@ -366,8 +366,7 @@ public class JDBCManager {
   }
 
   private boolean isKeyPartOfValue(String regionName) {
-    // TODO check config for mapping
-    return false;
+    return this.config.getIsKeyPartOfValue(regionName);
   }
 
   private String getKeyColumnName(String tableName) {
