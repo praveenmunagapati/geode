@@ -66,6 +66,8 @@ import org.apache.geode.internal.DSFIDFactory;
 import org.apache.geode.internal.DataSerializableFixedID;
 import org.apache.geode.internal.cache.CacheService;
 import org.apache.geode.internal.cache.InternalCache;
+import org.apache.geode.internal.cache.InternalRegion;
+import org.apache.geode.internal.cache.PartitionedRegion;
 import org.apache.geode.internal.cache.RegionListener;
 import org.apache.geode.internal.cache.extension.Extensible;
 import org.apache.geode.internal.cache.xmlcache.XmlGenerator;
@@ -228,7 +230,7 @@ public class LuceneServiceImpl implements InternalLuceneService {
     registerDefinedIndex(indexName, regionPath, new LuceneIndexCreationProfile(indexName,
         regionPath, fields, analyzer, fieldAnalyzers, serializer));
 
-    Region region = cache.getRegion(regionPath);
+    PartitionedRegion region = (PartitionedRegion) cache.getRegion(regionPath);
 
     LuceneRegionListener regionListener = new LuceneRegionListener(this, cache, indexName,
         regionPath, fields, analyzer, fieldAnalyzers, serializer);
@@ -248,23 +250,21 @@ public class LuceneServiceImpl implements InternalLuceneService {
 
   }
 
-  private void createIndexOnExistingRegion(Region region, String indexName, String regionPath,
+  private void createIndexOnExistingRegion(PartitionedRegion region, String indexName, String regionPath,
       String[] fields, Analyzer analyzer, Map<String, Analyzer> fieldAnalyzers,
       LuceneSerializer serializer) {
     validateRegionAttributes(region.getAttributes());
 
     String aeqId = LuceneServiceImpl.getUniqueIndexName(indexName, regionPath);
-    region.getAttributesMutator().addAsyncEventQueueId(aeqId);
+    region.addAsyncEventQueueId(aeqId, true);
 
-    // Add index creation profile
-    internalRegionArgs.addCacheServiceProfile(new LuceneIndexCreationProfile(indexName, regionPath,
+    region.addCacheServiceProfile(new LuceneIndexCreationProfile(indexName, regionPath,
         fields, analyzer, fieldAnalyzers, serializer));
 
     LuceneIndexImpl luceneIndex = beforeDataRegionCreated(indexName, regionPath,
         region.getAttributes(), analyzer, fieldAnalyzers, aeqId, serializer, fields);
 
-    // Add internal async event id
-    internalRegionArgs.addInternalAsyncEventQueueId(aeqId);
+    afterDataRegionCreated(luceneIndex);
   }
 
   static void validateRegionAttributes(RegionAttributes attrs) {
@@ -296,6 +296,12 @@ public class LuceneServiceImpl implements InternalLuceneService {
     if (this.managementListener != null) {
       this.managementListener.afterIndexCreated(index);
     }
+
+    String aeqId = LuceneServiceImpl.getUniqueIndexName(index.getName(), index.getRegionPath());
+    AsyncEventQueueImpl aeq = (AsyncEventQueueImpl) cache.getAsyncEventQueue(aeqId);
+    AbstractPartitionedRepositoryManager repositoryManager =
+        (AbstractPartitionedRepositoryManager) index.getRepositoryManager();
+    repositoryManager.allowRepositoryComputation();
 
   }
 

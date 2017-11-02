@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -187,11 +188,24 @@ public class LuceneIndexCreationIntegrationTest extends LuceneIntegrationTest {
 
   @Test()
   public void canCreateLuceneIndexAfterRegionCreatedIfAllowFlagIsSet()
-      throws IOException, ParseException {
-    createRegion();
+      throws IOException, ParseException, InterruptedException, LuceneQueryException {
+    Region region = createRegion();
+    LuceneService luceneService = LuceneServiceProvider.get(cache);
     final LuceneIndexFactoryImpl indexFactory =
-        (LuceneIndexFactoryImpl) LuceneServiceProvider.get(cache).createIndexFactory();
+        (LuceneIndexFactoryImpl) luceneService.createIndexFactory();
     indexFactory.setFields("field1", "field2").create(INDEX_NAME, REGION_NAME, true);
+
+    LuceneIndex index = luceneService.getIndex(INDEX_NAME, REGION_NAME);
+    assertNotNull(index);
+
+    region.put("key1", new TestObject("hello", "world"));
+    luceneService.waitUntilFlushed(INDEX_NAME, REGION_NAME, 1, TimeUnit.MINUTES);
+    LuceneQuery<Object, Object>
+        query =
+        luceneService.createLuceneQueryFactory()
+            .create(INDEX_NAME, REGION_NAME, "field1:hello", "field1");
+
+    assertEquals(Collections.singletonList("key1"), query.findKeys());
   }
 
   @Test

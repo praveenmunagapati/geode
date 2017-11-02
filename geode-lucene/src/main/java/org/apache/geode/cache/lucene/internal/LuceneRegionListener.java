@@ -108,11 +108,6 @@ public class LuceneRegionListener implements RegionListener {
     if (region.getFullPath().equals(this.regionPath)
         && this.afterCreateInvoked.compareAndSet(false, true)) {
       this.service.afterDataRegionCreated(this.luceneIndex);
-      String aeqId = LuceneServiceImpl.getUniqueIndexName(this.indexName, this.regionPath);
-      AsyncEventQueueImpl aeq = (AsyncEventQueueImpl) cache.getAsyncEventQueue(aeqId);
-      AbstractPartitionedRepositoryManager repositoryManager =
-          (AbstractPartitionedRepositoryManager) luceneIndex.getRepositoryManager();
-      repositoryManager.allowRepositoryComputation();
     }
   }
 

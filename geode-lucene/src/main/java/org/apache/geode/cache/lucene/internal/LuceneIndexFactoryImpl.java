@@ -67,7 +67,7 @@ public class LuceneIndexFactoryImpl implements LuceneIndexFactory {
 
   public void create(final String indexName, final String regionPath,
       boolean allowOnExistingRegion) {
-    service.createIndex(indexName, regionPath, fields, serializer, false);
+    service.createIndex(indexName, regionPath, fields, serializer, allowOnExistingRegion);
   }
 
   @Override

@@ -215,6 +215,7 @@ import org.apache.geode.internal.offheap.annotations.Released;
 import org.apache.geode.internal.offheap.annotations.Retained;
 import org.apache.geode.internal.offheap.annotations.Unretained;
 import org.apache.geode.internal.sequencelog.EntryLogger;
+import org.apache.geode.internal.util.concurrent.CopyOnWriteHashMap;
 import org.apache.geode.internal.util.concurrent.FutureResult;
 import org.apache.geode.internal.util.concurrent.StoppableCountDownLatch;
 import org.apache.geode.internal.util.concurrent.StoppableReadWriteLock;
@@ -541,7 +542,7 @@ public class LocalRegion extends AbstractRegion implements InternalRegion, Loade
     return this.stopper;
   }
 
-  Map<String, CacheServiceProfile> cacheServiceProfiles;
+  private final CopyOnWriteHashMap<String, CacheServiceProfile> cacheServiceProfiles = new CopyOnWriteHashMap<>();
 
   private static String calcFullPath(String regionName, LocalRegion parentRegion) {
     StringBuilder buf = null;
@@ -634,9 +635,9 @@ public class LocalRegion extends AbstractRegion implements InternalRegion, Loade
     this.isUsedForParallelGatewaySenderQueue =
         internalRegionArgs.isUsedForParallelGatewaySenderQueue();
     this.serialGatewaySender = internalRegionArgs.getSerialGatewaySender();
-    this.cacheServiceProfiles =
-        internalRegionArgs.getCacheServiceProfiles() == null ? Collections.emptyMap()
-            : Collections.unmodifiableMap(internalRegionArgs.getCacheServiceProfiles());
+    if(internalRegionArgs.getCacheServiceProfiles() != null) {
+      this.cacheServiceProfiles.putAll(internalRegionArgs.getCacheServiceProfiles());
+    }
 
     if (!isUsedForMetaRegion && !isUsedForPartitionedRegionAdmin
         && !isUsedForPartitionedRegionBucket && !isUsedForSerialGatewaySenderQueue
@@ -10399,7 +10400,11 @@ public class LocalRegion extends AbstractRegion implements InternalRegion, Loade
   }
 
   Map<String, CacheServiceProfile> getCacheServiceProfiles() {
-    return Collections.unmodifiableMap(this.cacheServiceProfiles);
+    return this.cacheServiceProfiles.getSnapshot();
+  }
+
+  public void addCacheServiceProfile(CacheServiceProfile profile) {
+    this.cacheServiceProfiles.put(profile.getId(), profile);
   }
 
   @Override
