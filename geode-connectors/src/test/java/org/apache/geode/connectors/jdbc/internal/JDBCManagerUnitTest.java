@@ -105,13 +105,15 @@ public class JDBCManagerUnitTest {
     private ResultSet tableResults;
     private ResultSet primaryKeyResults;
     private ResultSet queryResultSet;
+    private String tableName;
 
-    TestableJDBCManagerWithResultSets(JDBCConfiguration config, ResultSet tableResults,
-        ResultSet primaryKeyResults, ResultSet queryResultSet) {
+    TestableJDBCManagerWithResultSets(String tableName, JDBCConfiguration config,
+        ResultSet tableResults, ResultSet primaryKeyResults, ResultSet queryResultSet) {
       super(config);
       this.tableResults = tableResults;
       this.primaryKeyResults = primaryKeyResults;
       this.queryResultSet = queryResultSet;
+      this.tableName = tableName;
     }
 
     @Override
@@ -126,11 +128,11 @@ public class JDBCManagerUnitTest {
       if (tableResults == null) {
         tableResults = mock(ResultSet.class);
         when(tableResults.next()).thenReturn(true, false);
-        when(tableResults.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
+        when(tableResults.getString("TABLE_NAME")).thenReturn(this.tableName.toUpperCase());
       }
 
       DatabaseMetaData metaData = mock(DatabaseMetaData.class);
-      when(metaData.getPrimaryKeys(null, null, regionName.toUpperCase()))
+      when(metaData.getPrimaryKeys(null, null, this.tableName.toUpperCase()))
           .thenReturn(primaryKeyResults);
       when(metaData.getTables(any(), any(), any(), any())).thenReturn(tableResults);
 
@@ -165,15 +167,20 @@ public class JDBCManagerUnitTest {
   public void tearDown() throws Exception {}
 
   private void createManager(String... args) throws SQLException {
+    createManagerWithTableName(regionName, args);
+  }
+
+  private void createManagerWithTableName(String tableName, String... args) throws SQLException {
     ResultSet rsKeys = mock(ResultSet.class);
     when(rsKeys.next()).thenReturn(true, false);
     when(rsKeys.getString("COLUMN_NAME")).thenReturn(ID_COLUMN_NAME);
 
     ResultSet rs = mock(ResultSet.class);
     when(rs.next()).thenReturn(true, false);
-    when(rs.getString("TABLE_NAME")).thenReturn(regionName.toUpperCase());
+    when(rs.getString("TABLE_NAME")).thenReturn(tableName.toUpperCase());
 
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(args), rs, rsKeys, null);
+    this.mgr = new TestableJDBCManagerWithResultSets(tableName, createConfiguration(args), rs,
+        rsKeys, null);
   }
 
   private void createDefaultManager() throws SQLException {
@@ -190,8 +197,8 @@ public class JDBCManagerUnitTest {
 
   private void createManager(ResultSet tableNames, ResultSet primaryKeys, ResultSet queryResultSet,
       String... args) {
-    this.mgr = new TestableJDBCManagerWithResultSets(createConfiguration(args), tableNames,
-        primaryKeys, queryResultSet);
+    this.mgr = new TestableJDBCManagerWithResultSets(regionName, createConfiguration(args),
+        tableNames, primaryKeys, queryResultSet);
   }
 
   private JDBCConfiguration createConfiguration(String... args) {
@@ -604,6 +611,35 @@ public class JDBCManagerUnitTest {
         any());
     assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("id", "name", "age"));
     assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("1", "Emp1", 21));
+  }
 
+  @Test
+  public void verifyRegionToTable() throws SQLException {
+    String tableName = "mySqlTable";
+    createManagerWithTableName(tableName, "regionToTable", regionName + ":" + tableName);
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+
+    Region region = Fakes.region(regionName, cache);
+    Object key = "1";
+    PdxInstance value = this.mgr.read(region, key);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .isEqualTo("SELECT * FROM " + tableName + " WHERE " + ID_COLUMN_NAME + " = ?");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(1)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("1");
+    assertThat(value).isSameAs(pi);
+    ArgumentCaptor<String> fieldNameCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> fieldValueCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(factory, times(2)).writeField(fieldNameCaptor.capture(), fieldValueCaptor.capture(),
+        any());
+    assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("name", "age"));
+    assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
   }
 }

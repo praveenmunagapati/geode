@@ -176,7 +176,6 @@ public class JDBCConfigurationUnitTest {
     assertThat(config.getIsKeyPartOfValue("reg2")).isEqualTo(false);
   }
 
-
   public static class TestableJDBCConfiguration extends JDBCConfiguration {
     public TestableJDBCConfiguration(Properties configProps) {
       super(configProps);
@@ -187,4 +186,48 @@ public class JDBCConfigurationUnitTest {
       return "->";
     }
   }
+
+  @Test
+  public void testDefaultRegionToTableMap() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getTableForRegion("foo")).isEqualTo("foo");
+  }
+
+  @Test
+  public void testRegionToTableMap() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getTableForRegion("reg1")).isEqualTo("table1");
+  }
+
+  @Test
+  public void testRegionsToTablesMap() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1, reg2:table2");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getTableForRegion("reg1")).isEqualTo("table1");
+    assertThat(config.getTableForRegion("reg2")).isEqualTo("table2");
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyRegionToTableThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1, reg2:table2, reg3");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyDuplicateRegionToTableThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1, reg2:table2, reg2:table3");
+    new JDBCConfiguration(props);
+  }
+
 }

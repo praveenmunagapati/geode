@@ -415,8 +415,7 @@ public class JDBCManager {
   }
 
   private String getTableName(Region region) {
-    // TODO: check config for mapping
-    return region.getName();
+    return config.getTableForRegion(region.getName());
   }
 
   private void printResultSet(ResultSet rs) {

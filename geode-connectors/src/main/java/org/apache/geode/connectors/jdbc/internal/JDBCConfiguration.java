@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 
 public class JDBCConfiguration {
   private static final String URL = "url";
@@ -48,8 +49,14 @@ public class JDBCConfiguration {
    */
   private static final String VALUE_CLASS_NAME = "valueClassName";
 
-  private static final List<String> knownProperties = Collections
-      .unmodifiableList(Arrays.asList(URL, USER, PASSWORD, VALUE_CLASS_NAME, IS_KEY_PART_OF_VALUE));
+  /**
+   * syntax: comma separated list of regionTableSpecs. regionTableSpecs: regionName followed by
+   * jdbcRegionSeparator followed by tableName. Whitespace is only allowed around the commas.
+   */
+  private static final String REGION_TO_TABLE = "regionToTable";
+
+  private static final List<String> knownProperties = Collections.unmodifiableList(
+      Arrays.asList(URL, USER, PASSWORD, VALUE_CLASS_NAME, IS_KEY_PART_OF_VALUE, REGION_TO_TABLE));
 
   private static final List<String> requiredProperties =
       Collections.unmodifiableList(Arrays.asList(URL));
@@ -61,6 +68,7 @@ public class JDBCConfiguration {
   private final Map<String, String> regionToClassMap;
   private final boolean keyPartOfValueDefault;
   private final Map<String, Boolean> keyPartOfValueMap;
+  private final Map<String, String> regionToTableMap;
 
   public JDBCConfiguration(Properties configProps) {
     validateKnownProperties(configProps);
@@ -74,6 +82,11 @@ public class JDBCConfiguration {
     String keyPartOfValueProp = configProps.getProperty(IS_KEY_PART_OF_VALUE);
     this.keyPartOfValueDefault = computeDefaultKeyPartOfValue(keyPartOfValueProp);
     this.keyPartOfValueMap = computeKeyPartOfValueMap(keyPartOfValueProp);
+    this.regionToTableMap = computeRegionToTableMap(configProps.getProperty(REGION_TO_TABLE));
+  }
+
+  private Map<String, String> computeRegionToTableMap(String prop) {
+    return parseMap(prop, v -> v, true);
   }
 
   private String computeDefaultValueClassName(String valueClassNameProp) {
@@ -81,7 +94,7 @@ public class JDBCConfiguration {
   }
 
   private Map<String, String> computeRegionToClassMap(String valueClassNameProp) {
-    return parseMap(valueClassNameProp, v -> v);
+    return parseMap(valueClassNameProp, v -> v, false);
   }
 
   private boolean computeDefaultKeyPartOfValue(String keyPartOfValueProp) {
@@ -89,10 +102,11 @@ public class JDBCConfiguration {
   }
 
   private Map<String, Boolean> computeKeyPartOfValueMap(String keyPartOfValueProp) {
-    return parseMap(keyPartOfValueProp, Boolean::parseBoolean);
+    return parseMap(keyPartOfValueProp, Boolean::parseBoolean, false);
   }
 
-  private <V> Map<String, V> parseMap(String propertyValue, Function<String, V> parser) {
+  private <V> Map<String, V> parseMap(String propertyValue, Function<String, V> parser,
+      boolean failOnNoSeparator) {
     if (propertyValue == null) {
       return null;
     }
@@ -101,10 +115,18 @@ public class JDBCConfiguration {
     for (String item : items) {
       int idx = item.indexOf(getJdbcRegionSeparator());
       if (idx == -1) {
+        if (failOnNoSeparator) {
+          throw new IllegalArgumentException(
+              item + " does not contain " + getJdbcRegionSeparator());
+        }
         continue;
       }
       String regionName = item.substring(0, idx);
-      String valueString = item.substring(idx + getJdbcRegionSeparator().length());;
+      String valueString = item.substring(idx + getJdbcRegionSeparator().length());
+      if (result.containsKey(regionName)) {
+        throw new IllegalArgumentException(
+            "Duplicate region name " + regionName + " is not allowed.");
+      }
       result.put(regionName, parser.apply(valueString));
     }
     return result;
@@ -191,4 +213,14 @@ public class JDBCConfiguration {
     return JDBC_REGION_SEPARATOR;
   }
 
+  public String getTableForRegion(String regionName) {
+    if (this.regionToTableMap == null) {
+      return regionName;
+    }
+    String result = this.regionToTableMap.get(regionName);
+    if (result == null) {
+      result = regionName;
+    }
+    return result;
+  }
 }
