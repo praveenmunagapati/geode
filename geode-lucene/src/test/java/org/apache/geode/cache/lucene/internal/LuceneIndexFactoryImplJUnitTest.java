@@ -36,7 +36,8 @@ public class LuceneIndexFactoryImplJUnitTest {
     LuceneIndexFactory factory = new LuceneIndexFactoryImpl(service);
     factory.setLuceneSerializer(serializer);
     factory.create("index", "region");
-    Mockito.verify(service).createIndex(eq("index"), eq("region"), any(), eq(serializer), false);
+    Mockito.verify(service).createIndex(eq("index"), eq("region"), any(), eq(serializer),
+        eq(false));
   }
 
 }
