@@ -115,6 +115,14 @@ public class JDBCConfigurationUnitTest {
     new JDBCConfiguration(props);
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyValueClassNameWithTooManySeparatorsThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("valueClassName", "reg1:myClass1:extra");
+    new JDBCConfiguration(props);
+  }
+
   @Test
   public void testValueClassNameWithRegionNames() {
     Properties props = new Properties();
@@ -141,6 +149,14 @@ public class JDBCConfigurationUnitTest {
     Properties props = new Properties();
     props.setProperty("url", "");
     props.setProperty("isKeyPartOfValue", "true, reg1:true   , reg2:false, true");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyKeyPartOfValueWithExtraSeparatorThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("isKeyPartOfValue", "reg1:true:true");
     new JDBCConfiguration(props);
   }
 
@@ -186,7 +202,7 @@ public class JDBCConfigurationUnitTest {
     }
 
     @Override
-    protected String getjdbcSeparator() {
+    protected String getJdbcSeparator() {
       return "->";
     }
   }
@@ -225,6 +241,14 @@ public class JDBCConfigurationUnitTest {
     Properties props = new Properties();
     props.setProperty("url", "");
     props.setProperty("regionToTable", "reg1:table1, reg2:table2, reg3");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyRegionToTableWithTooManySeparatorsThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1:2");
     new JDBCConfiguration(props);
   }
 
@@ -314,6 +338,15 @@ public class JDBCConfigurationUnitTest {
   }
 
   @Test(expected = IllegalArgumentException.class)
+  public void verifyFieldToColumnTooManySeparatorsThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "reg1:field1:column1:extra");
+    new JDBCConfiguration(props);
+  }
+
+
+  @Test(expected = IllegalArgumentException.class)
   public void verifyDuplicateRegionFieldThrows() {
     Properties props = new Properties();
     props.setProperty("url", "");
@@ -346,10 +379,42 @@ public class JDBCConfigurationUnitTest {
   }
 
   @Test(expected = IllegalArgumentException.class)
+  public void verifyEmptyRegionThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", ":field1:column1");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyEmptyFieldThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "reg1::column1");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyEmptyColumnThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "reg1:field1:");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyEmptyAllThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", ":");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
   public void verifyFieldToColumnRequiresSeparator() {
     Properties props = new Properties();
     props.setProperty("url", "");
-    props.setProperty("regionToTable", "reg1:table1, reg2:table2, noSeparator");
+    props.setProperty("fieldToColumn", "reg1:table1, reg2:table2, noSeparator");
     new JDBCConfiguration(props);
   }
 

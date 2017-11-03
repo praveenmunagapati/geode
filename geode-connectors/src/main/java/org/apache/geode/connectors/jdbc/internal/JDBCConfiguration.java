@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.IntPredicate;
 
 public class JDBCConfiguration {
   private static final String URL = "url";
@@ -86,17 +85,17 @@ public class JDBCConfiguration {
     this.user = configProps.getProperty(USER);
     this.password = configProps.getProperty(PASSWORD);
     String valueClassNameProp = configProps.getProperty(VALUE_CLASS_NAME);
-    this.valueClassNameDefault = computeDefaultValueClassName(valueClassNameProp);
-    this.regionToClassMap = computeRegionToClassMap(valueClassNameProp);
+    this.regionToClassMap = parseRegionToClassMap(valueClassNameProp);
+    this.valueClassNameDefault = parseDefaultValueClassName(valueClassNameProp);
     String keyPartOfValueProp = configProps.getProperty(IS_KEY_PART_OF_VALUE);
-    this.keyPartOfValueDefault = computeDefaultKeyPartOfValue(keyPartOfValueProp);
-    this.keyPartOfValueMap = computeKeyPartOfValueMap(keyPartOfValueProp);
-    this.regionToTableMap = computeRegionToTableMap(configProps.getProperty(REGION_TO_TABLE));
-    this.fieldToColumnMap = computeFieldToColumnMap(configProps.getProperty(FIELD_TO_COLUMN));
-    this.columnToFieldMap = computeColumnToFieldMap(this.fieldToColumnMap);
+    this.keyPartOfValueMap = parseKeyPartOfValueMap(keyPartOfValueProp);
+    this.keyPartOfValueDefault = parseDefaultKeyPartOfValue(keyPartOfValueProp);
+    this.regionToTableMap = parseRegionToTableMap(configProps.getProperty(REGION_TO_TABLE));
+    this.fieldToColumnMap = parseFieldToColumnMap(configProps.getProperty(FIELD_TO_COLUMN));
+    this.columnToFieldMap = parseColumnToFieldMap(this.fieldToColumnMap);
   }
 
-  private Map<RegionAndName, String> computeColumnToFieldMap(Map<RegionAndName, String> map) {
+  private Map<RegionAndName, String> parseColumnToFieldMap(Map<RegionAndName, String> map) {
     if (map == null) {
       return null;
     }
@@ -111,7 +110,7 @@ public class JDBCConfiguration {
         if (outputKey.getRegionName() == null) {
           columnString = outputKey.getName();
         } else {
-          columnString = outputKey.getRegionName() + getjdbcSeparator() + outputKey.getName();
+          columnString = outputKey.getRegionName() + getJdbcSeparator() + outputKey.getName();
         }
         throw new IllegalArgumentException(
             " The column " + columnString + " can not be mapped to two different fields.");
@@ -173,16 +172,25 @@ public class JDBCConfiguration {
     }
   }
 
-  private Map<RegionAndName, String> computeFieldToColumnMap(String prop) {
+  private Map<RegionAndName, String> parseFieldToColumnMap(String prop) {
     Function<String, RegionAndName> regionFieldParser = new Function<String, RegionAndName>() {
       @Override
       public RegionAndName apply(String item) {
         String regionName = null;
         String fieldName;
-        int idx = item.indexOf(getjdbcSeparator());
+        int idx = item.indexOf(getJdbcSeparator());
         if (idx != -1) {
           regionName = item.substring(0, idx);
-          fieldName = item.substring(idx + getjdbcSeparator().length());
+          fieldName = item.substring(idx + getJdbcSeparator().length());
+          if (regionName.length() == 0 || fieldName.length() == 0) {
+            throw new IllegalArgumentException("Empty string found while splitting " + item
+                + " on the " + getJdbcSeparator() + " separator");
+          }
+
+          if (fieldName.contains(getJdbcSeparator())) {
+            throw new IllegalArgumentException(
+                "Too many " + getJdbcSeparator() + " separators in " + fieldName);
+          }
         } else {
           fieldName = item;
         }
@@ -192,24 +200,32 @@ public class JDBCConfiguration {
     return parseMap(prop, regionFieldParser, v -> v, true);
   }
 
-  private Map<String, String> computeRegionToTableMap(String prop) {
-    return parseMap(prop, String::toLowerCase, v -> v, true);
+  private Map<String, String> parseRegionToTableMap(String prop) {
+    return parseMap(prop, k -> parseRegionKey(k), v -> v, true);
   }
 
-  private String computeDefaultValueClassName(String valueClassNameProp) {
+  private String parseRegionKey(String key) {
+    if (key.contains(getJdbcSeparator())) {
+      throw new IllegalArgumentException(
+          "Too many " + getJdbcSeparator() + " separators in " + key);
+    }
+    return key.toLowerCase();
+  }
+
+  private String parseDefaultValueClassName(String valueClassNameProp) {
     return parseDefault(VALUE_CLASS_NAME, valueClassNameProp, v -> v, null);
   }
 
-  private Map<String, String> computeRegionToClassMap(String valueClassNameProp) {
-    return parseMap(valueClassNameProp, String::toLowerCase, v -> v, false);
+  private Map<String, String> parseRegionToClassMap(String valueClassNameProp) {
+    return parseMap(valueClassNameProp, k -> parseRegionKey(k), v -> v, false);
   }
 
-  private boolean computeDefaultKeyPartOfValue(String keyPartOfValueProp) {
+  private boolean parseDefaultKeyPartOfValue(String keyPartOfValueProp) {
     return parseDefault(IS_KEY_PART_OF_VALUE, keyPartOfValueProp, Boolean::parseBoolean, false);
   }
 
-  private Map<String, Boolean> computeKeyPartOfValueMap(String keyPartOfValueProp) {
-    return parseMap(keyPartOfValueProp, String::toLowerCase, Boolean::parseBoolean, false);
+  private Map<String, Boolean> parseKeyPartOfValueMap(String keyPartOfValueProp) {
+    return parseMap(keyPartOfValueProp, k -> parseRegionKey(k), Boolean::parseBoolean, false);
   }
 
   private <K, V> Map<K, V> parseMap(String propertyValue, Function<String, K> keyParser,
@@ -220,15 +236,19 @@ public class JDBCConfiguration {
     Map<K, V> result = new HashMap<>();
     List<String> items = Arrays.asList(propertyValue.split("\\s*,\\s*"));
     for (String item : items) {
-      int idx = item.lastIndexOf(getjdbcSeparator());
+      int idx = item.lastIndexOf(getJdbcSeparator());
       if (idx == -1) {
         if (failOnNoSeparator) {
-          throw new IllegalArgumentException(item + " does not contain " + getjdbcSeparator());
+          throw new IllegalArgumentException(item + " does not contain " + getJdbcSeparator());
         }
         continue;
       }
       String keyString = item.substring(0, idx);
-      String valueString = item.substring(idx + getjdbcSeparator().length());
+      String valueString = item.substring(idx + getJdbcSeparator().length());
+      if (keyString.length() == 0 || valueString.length() == 0) {
+        throw new IllegalArgumentException("Empty string found while splitting " + item + " on the "
+            + getJdbcSeparator() + " separator");
+      }
       K key = keyParser.apply(keyString);
       if (result.containsKey(key)) {
         throw new IllegalArgumentException("Duplicate item " + key + " is not allowed.");
@@ -246,13 +266,13 @@ public class JDBCConfiguration {
     V result = null;
     List<String> items = Arrays.asList(propertyValue.split("\\s*,\\s*"));
     for (String item : items) {
-      int idx = item.indexOf(getjdbcSeparator());
+      int idx = item.indexOf(getJdbcSeparator());
       if (idx != -1) {
         continue;
       }
       if (result != null) {
         throw new IllegalArgumentException(propertyName
-            + " can have at most one item that does not have a " + getjdbcSeparator() + " in it.");
+            + " can have at most one item that does not have a " + getJdbcSeparator() + " in it.");
       }
       result = parser.apply(item);
     }
@@ -314,7 +334,7 @@ public class JDBCConfiguration {
     return result;
   }
 
-  protected String getjdbcSeparator() {
+  protected String getJdbcSeparator() {
     return JDBC_SEPARATOR;
   }
 
@@ -346,7 +366,7 @@ public class JDBCConfiguration {
   }
 
   public String getFieldForRegionColumn(String regionName, String columnName) {
-    String result = columnName.toLowerCase();
+    String result = null;
     if (this.columnToFieldMap != null) {
       RegionAndName key = new RegionAndName(regionName, columnName);
       String mapValue = this.columnToFieldMap.get(key);
@@ -357,6 +377,9 @@ public class JDBCConfiguration {
       if (mapValue != null) {
         result = mapValue;
       }
+    }
+    if (result == null) {
+      result = columnName.toLowerCase();
     }
     return result;
   }
