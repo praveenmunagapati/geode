@@ -76,7 +76,8 @@ public class JDBCConfiguration {
   private final boolean keyPartOfValueDefault;
   private final Map<String, Boolean> keyPartOfValueMap;
   private final Map<String, String> regionToTableMap;
-  private final Map<RegionField, String> fieldToColumnMap;
+  private final Map<RegionAndName, String> fieldToColumnMap;
+  private final Map<RegionAndName, String> columnToFieldMap;
 
   public JDBCConfiguration(Properties configProps) {
     validateKnownProperties(configProps);
@@ -92,23 +93,57 @@ public class JDBCConfiguration {
     this.keyPartOfValueMap = computeKeyPartOfValueMap(keyPartOfValueProp);
     this.regionToTableMap = computeRegionToTableMap(configProps.getProperty(REGION_TO_TABLE));
     this.fieldToColumnMap = computeFieldToColumnMap(configProps.getProperty(FIELD_TO_COLUMN));
+    this.columnToFieldMap = computeColumnToFieldMap(this.fieldToColumnMap);
   }
 
-  public static class RegionField {
-    private final String regionName; // may be null
-    private final String fieldName;
+  private Map<RegionAndName, String> computeColumnToFieldMap(Map<RegionAndName, String> map) {
+    if (map == null) {
+      return null;
+    }
+    Map<RegionAndName, String> result = new HashMap<>();
+    for (Map.Entry<RegionAndName, String> entry : map.entrySet()) {
+      RegionAndName inputKey = entry.getKey();
+      String inputValue = entry.getValue();
+      String outputValue = inputKey.getName();
+      RegionAndName outputKey = new RegionAndName(inputKey.getRegionName(), inputValue);
+      if (result.containsKey(outputKey)) {
+        String columnString;
+        if (outputKey.getRegionName() == null) {
+          columnString = outputKey.getName();
+        } else {
+          columnString = outputKey.getRegionName() + getjdbcSeparator() + outputKey.getName();
+        }
+        throw new IllegalArgumentException(
+            " The column " + columnString + " can not be mapped to two different fields.");
+      }
+      result.put(outputKey, outputValue);
+    }
+    return result;
+  }
 
-    public RegionField(String regionName, String fieldName) {
+  public static class RegionAndName {
+    private final String regionName; // may be null
+    private final String name;
+
+    public RegionAndName(String regionName, String name) {
       this.regionName = regionName;
-      this.fieldName = fieldName;
+      this.name = name;
+    }
+
+    public String getRegionName() {
+      return this.regionName;
+    }
+
+    public String getName() {
+      return this.name;
     }
 
     @Override
     public int hashCode() {
       final int prime = 31;
       int result = 1;
-      result = prime * result + fieldName.hashCode();
-      result = prime * result + ((regionName == null) ? 0 : regionName.hashCode());
+      result = prime * result + name.toLowerCase().hashCode();
+      result = prime * result + ((regionName == null) ? 0 : regionName.toLowerCase().hashCode());
       return result;
     }
 
@@ -123,25 +158,25 @@ public class JDBCConfiguration {
       if (getClass() != obj.getClass()) {
         return false;
       }
-      RegionField other = (RegionField) obj;
-      if (!fieldName.equals(other.fieldName)) {
+      RegionAndName other = (RegionAndName) obj;
+      if (!name.equalsIgnoreCase(other.name)) {
         return false;
       }
       if (regionName == null) {
         if (other.regionName != null) {
           return false;
         }
-      } else if (!regionName.equals(other.regionName)) {
+      } else if (!regionName.equalsIgnoreCase(other.regionName)) {
         return false;
       }
       return true;
     }
   }
 
-  private Map<RegionField, String> computeFieldToColumnMap(String prop) {
-    Function<String, RegionField> regionFieldParser = new Function<String, RegionField>() {
+  private Map<RegionAndName, String> computeFieldToColumnMap(String prop) {
+    Function<String, RegionAndName> regionFieldParser = new Function<String, RegionAndName>() {
       @Override
-      public RegionField apply(String item) {
+      public RegionAndName apply(String item) {
         String regionName = null;
         String fieldName;
         int idx = item.indexOf(getjdbcSeparator());
@@ -151,14 +186,14 @@ public class JDBCConfiguration {
         } else {
           fieldName = item;
         }
-        return new RegionField(regionName, fieldName);
+        return new RegionAndName(regionName, fieldName);
       }
     };
     return parseMap(prop, regionFieldParser, v -> v, true);
   }
 
   private Map<String, String> computeRegionToTableMap(String prop) {
-    return parseMap(prop, k -> k, v -> v, true);
+    return parseMap(prop, String::toLowerCase, v -> v, true);
   }
 
   private String computeDefaultValueClassName(String valueClassNameProp) {
@@ -166,7 +201,7 @@ public class JDBCConfiguration {
   }
 
   private Map<String, String> computeRegionToClassMap(String valueClassNameProp) {
-    return parseMap(valueClassNameProp, k -> k, v -> v, false);
+    return parseMap(valueClassNameProp, String::toLowerCase, v -> v, false);
   }
 
   private boolean computeDefaultKeyPartOfValue(String keyPartOfValueProp) {
@@ -174,7 +209,7 @@ public class JDBCConfiguration {
   }
 
   private Map<String, Boolean> computeKeyPartOfValueMap(String keyPartOfValueProp) {
-    return parseMap(keyPartOfValueProp, k -> k, Boolean::parseBoolean, false);
+    return parseMap(keyPartOfValueProp, String::toLowerCase, Boolean::parseBoolean, false);
   }
 
   private <K, V> Map<K, V> parseMap(String propertyValue, Function<String, K> keyParser,
@@ -258,23 +293,23 @@ public class JDBCConfiguration {
   }
 
   public String getValueClassName(String regionName) {
-    if (this.regionToClassMap == null) {
-      return this.valueClassNameDefault;
-    }
-    String result = this.regionToClassMap.get(regionName);
-    if (result == null) {
-      result = this.valueClassNameDefault;
+    String result = this.valueClassNameDefault;
+    if (this.regionToClassMap != null) {
+      String mapValue = this.regionToClassMap.get(regionName.toLowerCase());
+      if (mapValue != null) {
+        result = mapValue;
+      }
     }
     return result;
   }
 
   public boolean getIsKeyPartOfValue(String regionName) {
-    if (this.keyPartOfValueMap == null) {
-      return this.keyPartOfValueDefault;
-    }
-    Boolean result = this.keyPartOfValueMap.get(regionName);
-    if (result == null) {
-      return this.keyPartOfValueDefault;
+    boolean result = this.keyPartOfValueDefault;
+    if (this.keyPartOfValueMap != null) {
+      Boolean mapValue = this.keyPartOfValueMap.get(regionName.toLowerCase());
+      if (mapValue != null) {
+        result = mapValue;
+      }
     }
     return result;
   }
@@ -284,27 +319,43 @@ public class JDBCConfiguration {
   }
 
   public String getTableForRegion(String regionName) {
-    if (this.regionToTableMap == null) {
-      return regionName;
-    }
-    String result = this.regionToTableMap.get(regionName);
-    if (result == null) {
-      result = regionName;
+    String result = regionName;
+    if (this.regionToTableMap != null) {
+      String mapValue = this.regionToTableMap.get(regionName.toLowerCase());
+      if (mapValue != null) {
+        result = mapValue;
+      }
     }
     return result;
   }
 
   public String getColumnForRegionField(String regionName, String fieldName) {
-    if (this.fieldToColumnMap == null) {
-      return fieldName;
+    String result = fieldName;
+    if (this.fieldToColumnMap != null) {
+      RegionAndName key = new RegionAndName(regionName, fieldName);
+      String mapValue = this.fieldToColumnMap.get(key);
+      if (mapValue == null) {
+        key = new RegionAndName(null, fieldName);
+        mapValue = this.fieldToColumnMap.get(key);
+      }
+      if (mapValue != null) {
+        result = mapValue;
+      }
     }
-    RegionField key = new RegionField(regionName, fieldName);
-    String result = this.fieldToColumnMap.get(key);
-    if (result == null) {
-      key = new RegionField(null, fieldName);
-      result = this.fieldToColumnMap.get(key);
-      if (result == null) {
-        result = regionName;
+    return result;
+  }
+
+  public String getFieldForRegionColumn(String regionName, String columnName) {
+    String result = columnName.toLowerCase();
+    if (this.columnToFieldMap != null) {
+      RegionAndName key = new RegionAndName(regionName, columnName);
+      String mapValue = this.columnToFieldMap.get(key);
+      if (mapValue == null) {
+        key = new RegionAndName(null, columnName);
+        mapValue = this.columnToFieldMap.get(key);
+      }
+      if (mapValue != null) {
+        result = mapValue;
       }
     }
     return result;

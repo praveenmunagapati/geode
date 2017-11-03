@@ -662,4 +662,34 @@ public class JDBCManagerUnitTest {
     assertThat(allObjects.get(1)).isEqualTo(21);
     assertThat(allObjects.get(2)).isEqualTo("1");
   }
+
+  @Test
+  public void verifyReadHonorsFieldToColum() throws SQLException {
+    createManager("fieldToColumn", "pdxname:name, " + regionName + ":pdxage:age");
+    GemFireCacheImpl cache = Fakes.cache();
+    PdxInstanceFactory factory = mock(PdxInstanceFactory.class);
+    PdxInstance pi = mock(PdxInstance.class);
+    when(factory.create()).thenReturn(pi);
+    when(cache.createPdxInstanceFactory("no class", false)).thenReturn(factory);
+
+    Region region = Fakes.region(regionName, cache);
+    Object key = "1";
+    PdxInstance value = this.mgr.read(region, key);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .isEqualTo("SELECT * FROM " + regionName + " WHERE " + ID_COLUMN_NAME + " = ?");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(1)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("1");
+    assertThat(value).isSameAs(pi);
+    ArgumentCaptor<String> fieldNameCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> fieldValueCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(factory, times(2)).writeField(fieldNameCaptor.capture(), fieldValueCaptor.capture(),
+        any());
+    assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("pdxname", "pdxage"));
+    assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
+  }
+
 }

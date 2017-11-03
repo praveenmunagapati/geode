@@ -93,7 +93,7 @@ public class JDBCManager {
           for (int i = 1; i <= ColumnsNumber; i++) {
             Object columnValue = rs.getObject(i);
             String columnName = rsmd.getColumnName(i);
-            String fieldName = mapColumnNameToFieldName(columnName, tableName);
+            String fieldName = mapColumnNameToFieldName(regionName, columnName);
             if (!isFieldExcluded(fieldName)
                 && (isKeyPartOfValue(regionName) || !keyColumnName.equalsIgnoreCase(columnName))) {
               factory.writeField(fieldName, columnValue, Object.class);
@@ -366,9 +366,8 @@ public class JDBCManager {
     return this.config.getColumnForRegionField(regionName, fieldName);
   }
 
-  private String mapColumnNameToFieldName(String columnName, String tableName) {
-    // TODO check config for mapping
-    return columnName.toLowerCase();
+  private String mapColumnNameToFieldName(String regionName, String columnName) {
+    return this.config.getFieldForRegionColumn(regionName, columnName);
   }
 
   private boolean isKeyPartOfValue(String regionName) {
