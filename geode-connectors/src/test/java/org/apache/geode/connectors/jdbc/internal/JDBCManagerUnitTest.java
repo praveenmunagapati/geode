@@ -642,4 +642,24 @@ public class JDBCManagerUnitTest {
     assertThat(fieldNameCaptor.getAllValues()).isEqualTo(Arrays.asList("name", "age"));
     assertThat(fieldValueCaptor.getAllValues()).isEqualTo(Arrays.asList("Emp1", 21));
   }
+
+  @Test
+  public void verifyFieldToColumn() throws SQLException {
+    createManager("fieldToColumn", "name:columnName, " + regionName + ":age:columnAge");
+    GemFireCacheImpl cache = Fakes.cache();
+    Region region = Fakes.region(regionName, cache);
+    PdxInstanceImpl pdx1 = mockPdxInstance("Emp1", 21);
+    this.mgr.write(region, Operation.CREATE, "1", pdx1);
+    verify(this.preparedStatement).execute();
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(this.connection).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue()).isEqualTo("INSERT INTO " + regionName + "(" + "columnName"
+        + ", " + "columnAge" + ", " + ID_COLUMN_NAME + ") VALUES (?,?,?)");
+    ArgumentCaptor<Object> objectCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(this.preparedStatement, times(3)).setObject(anyInt(), objectCaptor.capture());
+    List<Object> allObjects = objectCaptor.getAllValues();
+    assertThat(allObjects.get(0)).isEqualTo("Emp1");
+    assertThat(allObjects.get(1)).isEqualTo(21);
+    assertThat(allObjects.get(2)).isEqualTo("1");
+  }
 }

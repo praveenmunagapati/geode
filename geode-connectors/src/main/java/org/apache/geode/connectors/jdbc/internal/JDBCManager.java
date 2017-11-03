@@ -60,9 +60,15 @@ public class JDBCManager {
     this.config = config;
   }
 
+  private String getRegionName(Region r) {
+    return r.getName();
+  }
+
   public PdxInstance read(Region region, Object key) {
-    String tableName = getTableName(region);
-    List<ColumnValue> columnList = getColumnToValueList(tableName, key, null, Operation.GET);
+    final String regionName = getRegionName(region);
+    final String tableName = getTableName(regionName);
+    List<ColumnValue> columnList =
+        getColumnToValueList(regionName, tableName, key, null, Operation.GET);
     PreparedStatement pstmt = getPreparedStatement(columnList, tableName, Operation.GET, 0);
     synchronized (pstmt) {
       try {
@@ -74,7 +80,7 @@ public class JDBCManager {
         ResultSet rs = pstmt.executeQuery();
         if (rs.next()) {
           InternalCache cache = (InternalCache) region.getRegionService();
-          String valueClassName = getValueClassName(region.getName());
+          String valueClassName = getValueClassName(regionName);
           PdxInstanceFactory factory;
           if (valueClassName != null) {
             factory = cache.createPdxInstanceFactory(valueClassName);
@@ -88,8 +94,8 @@ public class JDBCManager {
             Object columnValue = rs.getObject(i);
             String columnName = rsmd.getColumnName(i);
             String fieldName = mapColumnNameToFieldName(columnName, tableName);
-            if (!isFieldExcluded(fieldName) && (isKeyPartOfValue(region.getName())
-                || !keyColumnName.equalsIgnoreCase(columnName))) {
+            if (!isFieldExcluded(fieldName)
+                && (isKeyPartOfValue(regionName) || !keyColumnName.equalsIgnoreCase(columnName))) {
               factory.writeField(fieldName, columnValue, Object.class);
             }
           }
@@ -115,12 +121,14 @@ public class JDBCManager {
   }
 
   public void write(Region region, Operation operation, Object key, PdxInstance value) {
-    String tableName = getTableName(region);
+    final String regionName = getRegionName(region);
+    final String tableName = getTableName(regionName);
     int pdxTypeId = 0;
     if (value != null) {
       pdxTypeId = ((PdxInstanceImpl) value).getPdxType().getTypeId();
     }
-    List<ColumnValue> columnList = getColumnToValueList(tableName, key, value, operation);
+    List<ColumnValue> columnList =
+        getColumnToValueList(regionName, tableName, key, value, operation);
     int updateCount = executeWrite(columnList, tableName, operation, pdxTypeId, false);
     if (operation.isDestroy()) {
       // TODO: should we check updateCount here? Probably not. It is possible we have nothing in the
@@ -322,8 +330,8 @@ public class JDBCManager {
     });
   }
 
-  private List<ColumnValue> getColumnToValueList(String tableName, Object key, PdxInstance value,
-      Operation operation) {
+  private List<ColumnValue> getColumnToValueList(String regionName, String tableName, Object key,
+      PdxInstance value, Operation operation) {
     String keyColumnName = getKeyColumnName(tableName);
     ColumnValue keyCV = new ColumnValue(true, keyColumnName, key);
     if (operation.isDestroy() || operation.isGet()) {
@@ -336,12 +344,12 @@ public class JDBCManager {
       if (isFieldExcluded(fieldName)) {
         continue;
       }
-      String columnName = mapFieldNameToColumnName(fieldName, tableName);
+      String columnName = mapFieldNameToColumnName(regionName, fieldName);
       if (columnName.equalsIgnoreCase(keyColumnName)) {
         continue;
       }
       Object columnValue = value.getField(fieldName);
-      ColumnValue cv = new ColumnValue(false, fieldName, columnValue);
+      ColumnValue cv = new ColumnValue(false, columnName, columnValue);
       // TODO: any need to order the items in the list?
       result.add(cv);
     }
@@ -354,9 +362,8 @@ public class JDBCManager {
     return false;
   }
 
-  private String mapFieldNameToColumnName(String fieldName, String tableName) {
-    // TODO check config for mapping
-    return fieldName;
+  private String mapFieldNameToColumnName(String regionName, String fieldName) {
+    return this.config.getColumnForRegionField(regionName, fieldName);
   }
 
   private String mapColumnNameToFieldName(String columnName, String tableName) {
@@ -414,8 +421,8 @@ public class JDBCManager {
     throw new IllegalStateException("NYI: handleSQLException", e);
   }
 
-  private String getTableName(Region region) {
-    return config.getTableForRegion(region.getName());
+  private String getTableName(String regionName) {
+    return config.getTableForRegion(regionName);
   }
 
   private void printResultSet(ResultSet rs) {

@@ -154,7 +154,7 @@ public class JDBCConfigurationUnitTest {
   }
 
   @Test
-  public void testIsKeyPartOfValueWithJdbcRegionSeparator() {
+  public void testIsKeyPartOfValueWithjdbcSeparator() {
     Properties props = new Properties();
     props.setProperty("url", "");
     props.setProperty("isKeyPartOfValue", "true, reg1->true   , reg2->false");
@@ -166,7 +166,7 @@ public class JDBCConfigurationUnitTest {
 
 
   @Test
-  public void testIsKeyPartOfValueWithJdbcRegionSeparatorNoDefaultValue() {
+  public void testIsKeyPartOfValueWithjdbcSeparatorNoDefaultValue() {
     Properties props = new Properties();
     props.setProperty("url", "");
     props.setProperty("isKeyPartOfValue", "reg1->true,reg2->false");
@@ -182,7 +182,7 @@ public class JDBCConfigurationUnitTest {
     }
 
     @Override
-    protected String getJdbcRegionSeparator() {
+    protected String getjdbcSeparator() {
       return "->";
     }
   }
@@ -230,4 +230,58 @@ public class JDBCConfigurationUnitTest {
     new JDBCConfiguration(props);
   }
 
+  @Test
+  public void testDefaultFieldToColumnMap() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getColumnForRegionField("reg1", "field1")).isEqualTo("field1");
+  }
+
+  @Test
+  public void testFieldToColumnMap() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "field1:column1");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getColumnForRegionField("reg1", "field1")).isEqualTo("column1");
+  }
+
+  @Test
+  public void testFieldToColumnMapWithMoreThanOne() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn",
+        "reg0:field2:othercolumn2, reg1:field1:column1, field2:column2, reg3:field1:othercolumn1");
+    JDBCConfiguration config = new JDBCConfiguration(props);
+    assertThat(config.getColumnForRegionField("reg1", "field1")).isEqualTo("column1");
+    assertThat(config.getColumnForRegionField("reg3", "field1")).isEqualTo("othercolumn1");
+    assertThat(config.getColumnForRegionField("reg0", "field2")).isEqualTo("othercolumn2");
+    assertThat(config.getColumnForRegionField("regAny", "field2")).isEqualTo("column2");
+    assertThat(config.getColumnForRegionField("regOther", "field2")).isEqualTo("column2");
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyDuplicateFieldThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "field1:column1, field1:column2");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyDuplicateRegionFieldThrows() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("fieldToColumn", "reg1:field1:column1, reg1:field1:column2");
+    new JDBCConfiguration(props);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void verifyFieldToColumnRequiresSeparator() {
+    Properties props = new Properties();
+    props.setProperty("url", "");
+    props.setProperty("regionToTable", "reg1:table1, reg2:table2, noSeparator");
+    new JDBCConfiguration(props);
+  }
 }
