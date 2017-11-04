@@ -993,60 +993,6 @@ public class MemberMBeanBridge {
   }
 
   /**
-   * backs up all the disk to the targeted directory
-   * 
-   * @param targetDirPath path of the directory where back up is to be taken
-   * @return array of DiskBackup results which might get aggregated at Managing node Check the
-   *         validity of this mbean call. When does it make sense to backup a single member of a
-   *         gemfire system in isolation of the other members?
-   */
-  public DiskBackupResult[] backupMember(String targetDirPath) {
-    if (cache != null) {
-      Collection<DiskStore> diskStores = cache.listDiskStoresIncludingRegionOwned();
-      for (DiskStore store : diskStores) {
-        store.flush();
-      }
-    }
-
-    DiskBackupResult[] diskBackUpResult = null;
-    File targetDir = new File(targetDirPath);
-
-    if (cache == null) {
-      return null;
-
-    } else {
-      try {
-        BackupManager manager =
-            cache.startBackup(cache.getInternalDistributedSystem().getDistributedMember());
-        boolean abort = true;
-        Set<PersistentID> existingDataStores;
-        Set<PersistentID> successfulDataStores;
-        try {
-          existingDataStores = manager.prepareForBackup();
-          abort = false;
-        } finally {
-          successfulDataStores = manager.doBackup(targetDir, null/* TODO rishi */, abort);
-        }
-        diskBackUpResult = new DiskBackupResult[existingDataStores.size()];
-        int j = 0;
-
-        for (PersistentID id : existingDataStores) {
-          if (successfulDataStores.contains(id)) {
-            diskBackUpResult[j] = new DiskBackupResult(id.getDirectory(), false);
-          } else {
-            diskBackUpResult[j] = new DiskBackupResult(id.getDirectory(), true);
-          }
-          j++;
-        }
-
-      } catch (IOException e) {
-        throw new ManagementException(e);
-      }
-    }
-    return diskBackUpResult;
-  }
-
-  /**
    * @return The name for this member.
    */
   public String getName() {

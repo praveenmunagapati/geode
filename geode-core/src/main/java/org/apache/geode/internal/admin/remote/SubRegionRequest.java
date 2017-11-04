@@ -44,9 +44,10 @@ public class SubRegionRequest extends RegionAdminRequest {
 
   /**
    * Must return a proper response to this request.
+   * @param dm
    */
   @Override
-  protected AdminResponse createResponse(DistributionManager dm) {
+  protected AdminResponse createResponse(DM dm) {
     return SubRegionResponse.create(dm, this.getSender(), this.getRegion(dm.getSystem()));
   }
 

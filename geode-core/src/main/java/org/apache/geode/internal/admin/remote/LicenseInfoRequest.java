@@ -42,9 +42,10 @@ public class LicenseInfoRequest extends AdminRequest {
 
   /**
    * Must return a proper response to this request.
+   * @param dm
    */
   @Override
-  protected AdminResponse createResponse(DistributionManager dm) {
+  protected AdminResponse createResponse(DM dm) {
     return LicenseInfoResponse.create(dm, this.getSender());
   }
 

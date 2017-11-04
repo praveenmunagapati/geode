@@ -30,7 +30,7 @@ public class TailLogRequest extends AdminRequest {
   }
 
   @Override
-  public AdminResponse createResponse(DistributionManager dm) {
+  public AdminResponse createResponse(DM dm) {
     return TailLogResponse.create(dm, this.getSender());
   }
 

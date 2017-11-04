@@ -42,7 +42,7 @@ public class FetchStatsRequest extends AdminRequest {
   }
 
   @Override
-  public AdminResponse createResponse(DistributionManager dm) {
+  public AdminResponse createResponse(DM dm) {
     return FetchStatsResponse.create(dm, this.getSender(), this.statisticsTypeName);
   }
 

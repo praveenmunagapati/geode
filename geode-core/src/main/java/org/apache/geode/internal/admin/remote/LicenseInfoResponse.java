@@ -15,7 +15,7 @@
 package org.apache.geode.internal.admin.remote;
 
 import org.apache.geode.DataSerializer;
-import org.apache.geode.distributed.internal.DistributionManager;
+import org.apache.geode.distributed.internal.DM;
 import org.apache.geode.distributed.internal.membership.InternalDistributedMember;
 import org.apache.geode.internal.logging.LogService;
 import org.apache.logging.log4j.Logger;
@@ -40,8 +40,8 @@ public class LicenseInfoResponse extends AdminResponse {
   /**
    * Returns a <code>LicenseInfoResponse</code> that will be returned to the specified recipient.
    */
-  public static LicenseInfoResponse create(DistributionManager dm,
-      InternalDistributedMember recipient) {
+  public static LicenseInfoResponse create(DM dm,
+                                           InternalDistributedMember recipient) {
     LicenseInfoResponse m = new LicenseInfoResponse();
     m.setRecipient(recipient);
     m.p = new Properties();

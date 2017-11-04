@@ -17,8 +17,8 @@
 package org.apache.geode.internal.admin.remote;
 
 import org.apache.geode.DataSerializer;
+import org.apache.geode.distributed.internal.DM;
 import org.apache.geode.distributed.internal.DistributionConfig;
-import org.apache.geode.distributed.internal.DistributionManager;
 import org.apache.geode.distributed.internal.membership.InternalDistributedMember;
 import org.apache.geode.internal.GemFireVersion;
 import org.apache.geode.internal.net.SocketCreator;
@@ -59,8 +59,8 @@ public class FetchHostResponse extends AdminResponse {
    * Returns a <code>FetchHostResponse</code> that will be returned to the specified recipient. The
    * message will contains a copy of this vm's local host.
    */
-  public static FetchHostResponse create(DistributionManager dm,
-      InternalDistributedMember recipient) {
+  public static FetchHostResponse create(DM dm,
+                                         InternalDistributedMember recipient) {
     FetchHostResponse m = new FetchHostResponse();
     m.setRecipient(recipient);
     try {
